@@ -14,6 +14,7 @@ import {
   reelProviderLock,
   saveStill,
   saveVideo,
+  sceneRetryPhase,
   sceneSnapshot,
 } from "./steps";
 
@@ -39,6 +40,66 @@ export async function reelWorkflow(reelId: string): Promise<void> {
     await closeReel(reelId);
     throw error;
   }
+}
+
+export async function sceneWorkflow(reelId: string, sceneKey: SceneKey): Promise<void> {
+  "use workflow";
+  try {
+    await rerunScene(reelId, sceneKey);
+  } catch {
+    try {
+      const progress = await sceneSnapshot(reelId, sceneKey);
+      if (progress.status !== "complete" && progress.status !== "failed") {
+        await markScene(reelId, sceneKey, { status: "failed", errorCode: "provider_error" });
+      }
+    } catch {
+      // finishReel still publishes the parent status from the rows that remain.
+    }
+  }
+  await finishReel(reelId);
+}
+
+async function rerunScene(reelId: string, key: SceneKey): Promise<void> {
+  const phase = await sceneRetryPhase(reelId, key);
+  if (phase.kind === "redownload-image") {
+    await redownloadStill(reelId, key, phase.projectId);
+    return;
+  }
+  if (phase.kind === "redownload-video") {
+    await redownloadClip(reelId, key, phase.projectId);
+    return;
+  }
+  if (phase.kind === "new-image") {
+    const still = await produceStill(reelId, key);
+    if (still === "ready") await produceVideo(reelId, key);
+    return;
+  }
+  if (phase.kind === "new-video") await produceVideo(reelId, key);
+}
+
+async function redownloadStill(reelId: string, key: SceneKey, projectId: string): Promise<void> {
+  const snapshot = await getProject(reelId, key, projectId, "image");
+  if (snapshot.status === "complete" && snapshot.downloads.length > 0) {
+    const saved = await saveStill(reelId, key, snapshot.downloads[0].url);
+    if (saved.ok) await produceVideo(reelId, key);
+    return;
+  }
+  await markScene(reelId, key, {
+    status: "failed",
+    errorCode: snapshot.status === "complete" ? "download_failed" : "provider_error",
+  });
+}
+
+async function redownloadClip(reelId: string, key: SceneKey, projectId: string): Promise<void> {
+  const snapshot = await getProject(reelId, key, projectId, "video");
+  if (snapshot.status === "complete" && snapshot.downloads.length > 0) {
+    await saveVideo(reelId, key, snapshot.downloads[0].url);
+    return;
+  }
+  await markScene(reelId, key, {
+    status: "failed",
+    errorCode: snapshot.status === "complete" ? "download_failed" : "provider_error",
+  });
 }
 
 async function produceStill(reelId: string, key: SceneKey): Promise<"ready" | "failed"> {

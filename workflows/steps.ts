@@ -121,6 +121,26 @@ export async function sceneSnapshot(
   };
 }
 
+export type SceneRetryPhase =
+  | { kind: "redownload-image"; projectId: string }
+  | { kind: "redownload-video"; projectId: string }
+  | { kind: "new-image" }
+  | { kind: "new-video" }
+  | { kind: "idle" };
+
+export async function sceneRetryPhase(reelId: string, key: SceneKey): Promise<SceneRetryPhase> {
+  "use step";
+  const scene = await loadScene(reelId, key);
+  if (!scene) return { kind: "idle" };
+  const hasStill = scene.stillPath != null;
+  const hasVideo = scene.videoPath != null;
+  if (scene.imageProjectId && !hasStill) return { kind: "redownload-image", projectId: scene.imageProjectId };
+  if (scene.videoProjectId && hasStill && !hasVideo) return { kind: "redownload-video", projectId: scene.videoProjectId };
+  if (!scene.imageProjectId) return { kind: "new-image" };
+  if (hasStill && !scene.videoProjectId) return { kind: "new-video" };
+  return { kind: "idle" };
+}
+
 const TERMINAL_PROVIDER_STATUSES = new Set(["complete", "error", "canceled"]);
 
 export async function readTerminalEvent(projectId: string): Promise<{ status: string } | null> {

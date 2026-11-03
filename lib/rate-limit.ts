@@ -27,6 +27,10 @@ export function minuteWindowStart(now: Date): Date {
   return new Date(Math.floor(now.getTime() / 60_000) * 60_000);
 }
 
+export function hourWindowStart(now: Date): Date {
+  return new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000);
+}
+
 export async function lockIp(tx: DbTx, ipHash: string): Promise<void> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${ipHash}, 0))`);
 }
