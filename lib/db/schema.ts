@@ -12,11 +12,40 @@ export const sources = pgTable("sources", {
   consumedAt: timestamp("consumed_at", { withTimezone: true }),
 });
 
+export const vehicles = pgTable(
+  "vehicles",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    year: integer("year").notNull(),
+    make: text("make").notNull(),
+    model: text("model").notNull(),
+    makeKey: text("make_key").notNull(),
+    modelKey: text("model_key").notNull(),
+    query: text("query").notNull(),
+  },
+  (table) => [unique("vehicles_year_make_key_model_key_unique").on(table.year, table.makeKey, table.modelKey)],
+);
+
+export const vehicleImages = pgTable(
+  "vehicle_images",
+  {
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id),
+    angle: text("angle").notNull(),
+    storagePath: text("storage_path").notNull(),
+    source: text("source").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.vehicleId, table.angle] })],
+);
+
 export const reels = pgTable("reels", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   status: text("status").notNull(),
   sourceKind: text("source_kind").notNull(),
-  vehicleId: uuid("vehicle_id"),
+  vehicleId: uuid("vehicle_id").references(() => vehicles.id),
   sourcePath: text("source_path"),
   errorCode: text("error_code"),
   ipHash: text("ip_hash").notNull(),
