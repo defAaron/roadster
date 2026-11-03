@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { Disclaimer } from "@/components/disclaimer";
 import { ResultView } from "@/components/result-view";
 import { projectFakeReel } from "@/lib/fake-reel";
@@ -12,11 +12,23 @@ test("disclaimer markup contains the affiliation sentence", () => {
 
 test("a finished fake reel offers four downloads and both retry buttons", () => {
   const reel = projectFakeReel("00000000-0000-4000-8000-000000000001", 0, 21_000);
-  const html = renderToStaticMarkup(ResultView({ reel }));
+  const onRetry = vi.fn();
+  const html = renderToStaticMarkup(ResultView({ reel, onRetry }));
   expect(html).toContain("Download still");
   expect(html).toContain("Download video");
   expect(html.match(/Download still/g)).toHaveLength(2);
   expect(html.match(/Try this scene again/g)).toHaveLength(2);
+  expect(html).not.toContain("disabled");
+  expect(html).not.toContain("aria-disabled");
   expect(html).toContain("Filming the flyover");
   expect(html).toContain("not affiliated with Tesla");
+
+  const notice = renderToStaticMarkup(
+    ResultView({
+      reel,
+      onRetry,
+      retryNotice: { sceneKey: "kickflip", message: "That scene is still running." },
+    }),
+  );
+  expect(notice).toContain("That scene is still running.");
 });

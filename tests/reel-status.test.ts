@@ -35,6 +35,24 @@ test("a missing flyover scene is waiting, not failed", () => {
   expect(stageDot(reel, 2)).toBe("waiting");
 });
 
+test("a finished kickflip and a failed flyover is partial and keeps both results", () => {
+  const reel: ReelView = {
+    id: "r",
+    status: "partial",
+    errorCode: null,
+    scenes: [
+      scene("kickflip", "complete", "/kick.jpg", "/kick.mp4"),
+      { key: "flyover", status: "failed", stillUrl: null, videoUrl: null, errorCode: "provider_error" },
+    ],
+  };
+  expect(deriveReelStatus(reel.scenes)).toBe("partial");
+  const kickflip = reel.scenes.find((row) => row.key === "kickflip");
+  const flyover = reel.scenes.find((row) => row.key === "flyover");
+  expect(kickflip?.stillUrl).toBe("/kick.jpg");
+  expect(kickflip?.videoUrl).toBe("/kick.mp4");
+  expect(flyover?.errorCode).toBe("provider_error");
+});
+
 test("kickflip still is done once a still url exists", () => {
   const reel: ReelView = {
     id: "r",
