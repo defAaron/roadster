@@ -128,6 +128,7 @@ export function HomeFlow() {
     <div className="mt-8">
       {fileError ? <p className="mb-3">{fileError}</p> : null}
       <input
+        id="car-photo"
         type="file"
         accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
         aria-label="Car photo"

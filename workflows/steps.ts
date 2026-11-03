@@ -2,8 +2,9 @@ import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { FatalError } from "workflow";
 import { readConfig } from "@/lib/config";
 import { db } from "@/lib/db/client";
-import { providerEvents, reelScenes, reels } from "@/lib/db/schema";
+import { providerEvents, reelScenes, reels, vehicles } from "@/lib/db/schema";
 import { alert } from "@/lib/log";
+import { isUuid } from "@/lib/http/session";
 import { downloadAllowed } from "@/lib/magic-hour/download";
 import { createMagicHourClient, MagicHourHttpError, type MagicHourProject } from "@/lib/magic-hour/client";
 import { deriveReelStatus } from "@/lib/reel-status";
@@ -196,6 +197,11 @@ export async function createImageIfNeeded(
     await failScene(reelId, key, "provider_error");
     return { ok: false };
   }
+  const identity = reelPromptIdentity(reel);
+  if (!identity) {
+    await failScene(reelId, key, "provider_error");
+    return { ok: false };
+  }
 
   const attempt = options.forceNew ? scene.attempt + 1 : scene.attempt;
   const client = magicClient();
@@ -216,7 +222,7 @@ export async function createImageIfNeeded(
   }
 
   try {
-    const { stillPrompt } = scenePrompts(key, identityLine({ kind: "upload" }));
+    const { stillPrompt } = scenePrompts(key, identity);
     const created = await client.createImage({
       name: `reel_${reelId}_${key}_still`,
       prompt: stillPrompt,
@@ -256,11 +262,16 @@ export async function createVideoIfNeeded(
     await failScene(reelId, key, "provider_error");
     return { ok: false };
   }
+  const identity = reelPromptIdentity(reel);
+  if (!identity) {
+    await failScene(reelId, key, "provider_error");
+    return { ok: false };
+  }
 
   const attempt = options.forceNew ? scene.attempt + 1 : scene.attempt;
   try {
     const client = magicClient();
-    const { motionPrompt } = scenePrompts(key, identityLine({ kind: "upload" }));
+    const { motionPrompt } = scenePrompts(key, identity);
     const created = await client.createVideo({
       name: `reel_${reelId}_${key}`,
       prompt: motionPrompt,
@@ -539,11 +550,31 @@ function isProviderLock(code: string | null | undefined): code is "provider_auth
 
 async function loadReel(reelId: string) {
   const [reel] = await db
-    .select({ sourcePath: reels.sourcePath, errorCode: reels.errorCode })
+    .select({
+      sourcePath: reels.sourcePath,
+      errorCode: reels.errorCode,
+      sourceKind: reels.sourceKind,
+      year: vehicles.year,
+      make: vehicles.make,
+      model: vehicles.model,
+    })
     .from(reels)
+    .leftJoin(vehicles, eq(reels.vehicleId, vehicles.id))
     .where(eq(reels.id, reelId))
     .limit(1);
   return reel ?? null;
+}
+
+function reelPromptIdentity(reel: {
+  sourceKind: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+}): string | null {
+  if (reel.sourceKind !== "catalog") return identityLine({ kind: "upload" });
+  if (reel.year == null || reel.make == null || reel.model == null) return null;
+  if (reel.make.trim() === "" || reel.model.trim() === "") return null;
+  return identityLine({ kind: "catalog", year: reel.year, make: reel.make, model: reel.model });
 }
 
 async function postgresNow(): Promise<Date> {
@@ -555,7 +586,11 @@ async function postgresNow(): Promise<Date> {
 }
 
 function isSourcePath(path: string): boolean {
-  return path.startsWith("originals/") && !path.includes("..");
+  if (path.includes("..")) return false;
+  if (path.startsWith("originals/")) return true;
+  const match = /^catalog\/([^/]+)\/front_three_quarter\.jpg$/.exec(path);
+  const vehicleId = match?.[1];
+  return vehicleId != null && isUuid(vehicleId);
 }
 
 function clip(value: string | null): string | null {
