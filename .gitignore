@@ -1,3 +1,10 @@
 # Agent-specific docs
 docs/
 .cursor/
+node_modules
+.next
+.env
+.env.local
+.vercel
+/.swc
+tsconfig.tsbuildinfo

@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f4f1ea;
+  --ink: #1c1915;
+  --copper: #9a3412;
+  --line: #d9d3c7;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+}
