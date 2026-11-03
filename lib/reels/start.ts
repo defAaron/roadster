@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { saveKickflipProgress } from "@/lib/db/reels";
+import { saveFakeReelProgress } from "@/lib/db/reels";
 import { deriveReelStatus } from "@/lib/reel-status";
 import type { SceneStatus } from "@/lib/types";
 import { reelObjectStore } from "@/lib/reels/store";
@@ -19,29 +19,37 @@ function fixturePath(name: string): string {
   return path.join(process.cwd(), "public", "fixtures", name);
 }
 
-async function advanceFakeKickflip(reelId: string, startedMs: number): Promise<void> {
+async function advanceFakeReel(reelId: string, startedMs: number): Promise<void> {
   const step = fakeStep(Date.now() - startedMs);
-  const paths: { stillPath?: string; videoPath?: string } = {};
   const store = reelObjectStore();
+  const paths: Record<"kickflip" | "flyover", { stillPath?: string; videoPath?: string }> = {
+    kickflip: {},
+    flyover: {},
+  };
   if (step.still) {
-    const stillPath = `results/${reelId}/kickflip.svg`;
-    await store.put(stillPath, await readFile(fixturePath("kickflip.svg")), "image/svg+xml");
-    paths.stillPath = stillPath;
+    for (const key of ["kickflip", "flyover"] as const) {
+      const stillPath = `results/${reelId}/${key}.svg`;
+      await store.put(stillPath, await readFile(fixturePath(`${key}.svg`)), "image/svg+xml");
+      paths[key].stillPath = stillPath;
+    }
   }
   if (step.video) {
-    const videoPath = `results/${reelId}/kickflip.mp4`;
-    await store.put(videoPath, await readFile(fixturePath("sample.mp4")), "video/mp4");
-    paths.videoPath = videoPath;
+    const bytes = await readFile(fixturePath("sample.mp4"));
+    for (const key of ["kickflip", "flyover"] as const) {
+      const videoPath = `results/${reelId}/${key}.mp4`;
+      await store.put(videoPath, bytes, "video/mp4");
+      paths[key].videoPath = videoPath;
+    }
   }
-  const reelStatus = deriveReelStatus([{ status: step.sceneStatus }]);
-  await saveKickflipProgress(reelId, step.sceneStatus, reelStatus, paths);
+  const reelStatus = deriveReelStatus([{ status: step.sceneStatus }, { status: step.sceneStatus }]);
+  await saveFakeReelProgress(reelId, step.sceneStatus, reelStatus, paths);
 }
 
-function scheduleFakeKickflip(reelId: string): void {
+function scheduleFakeReel(reelId: string): void {
   const startedMs = Date.now();
   for (const mark of MARKS_MS) {
     const timer = setTimeout(() => {
-      void advanceFakeKickflip(reelId, startedMs).catch(() => {
+      void advanceFakeReel(reelId, startedMs).catch(() => {
         console.error(JSON.stringify({ level: "error", operation: "fake_reel", reel_id: reelId }));
       });
     }, mark);
@@ -62,5 +70,5 @@ export async function startReel(reelId: string): Promise<void> {
     await startLive(reelId);
     return;
   }
-  scheduleFakeKickflip(reelId);
+  scheduleFakeReel(reelId);
 }

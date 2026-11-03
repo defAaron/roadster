@@ -76,12 +76,20 @@ export async function createReelFromSource(input: {
       createdAt: input.now,
       updatedAt: input.now,
     });
-    await tx.insert(reelScenes).values({
-      reelId: input.reelId,
-      sceneKey: "kickflip",
-      status: "pending",
-      attempt: 1,
-    });
+    await tx.insert(reelScenes).values([
+      {
+        reelId: input.reelId,
+        sceneKey: "kickflip",
+        status: "pending",
+        attempt: 1,
+      },
+      {
+        reelId: input.reelId,
+        sceneKey: "flyover",
+        status: "pending",
+        attempt: 1,
+      },
+    ]);
     return { ok: true };
   });
 }
@@ -120,20 +128,23 @@ export async function loadReel(id: string): Promise<LoadedReel | null> {
   return { id: reel.id, errorCode: reel.errorCode, scenes };
 }
 
-export async function saveKickflipProgress(
+export async function saveFakeReelProgress(
   reelId: string,
   sceneStatus: "pending" | "editing" | "still_ready" | "animating" | "complete" | "failed",
   reelStatus: "queued" | "editing" | "animating" | "complete" | "partial" | "failed",
-  paths: { stillPath?: string; videoPath?: string },
+  paths: Record<"kickflip" | "flyover", { stillPath?: string; videoPath?: string }>,
 ): Promise<void> {
-  await db
-    .update(reelScenes)
-    .set({
-      status: sceneStatus,
-      ...(paths.stillPath ? { stillPath: paths.stillPath } : {}),
-      ...(paths.videoPath ? { videoPath: paths.videoPath } : {}),
-    })
-    .where(and(eq(reelScenes.reelId, reelId), eq(reelScenes.sceneKey, "kickflip")));
+  for (const key of ["kickflip", "flyover"] as const) {
+    const files = paths[key];
+    await db
+      .update(reelScenes)
+      .set({
+        status: sceneStatus,
+        ...(files.stillPath ? { stillPath: files.stillPath } : {}),
+        ...(files.videoPath ? { videoPath: files.videoPath } : {}),
+      })
+      .where(and(eq(reelScenes.reelId, reelId), eq(reelScenes.sceneKey, key)));
+  }
   await db.update(reels).set({ status: reelStatus, updatedAt: new Date() }).where(eq(reels.id, reelId));
 }
 

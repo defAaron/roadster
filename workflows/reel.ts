@@ -1,32 +1,39 @@
-import { sleep } from "workflow";
+import { createHook, sleep } from "workflow";
 import type { SceneKey } from "@/lib/types";
 import {
+  alertReelFailureRate,
   closeReel,
   createImageIfNeeded,
   createVideoIfNeeded,
-  finishStatus,
+  finishReel,
   getProject,
   markReel,
   markScene,
+  projectAgeSec,
+  readTerminalEvent,
+  reelProviderLock,
   saveStill,
   saveVideo,
-  type ProjectSnapshot,
+  sceneSnapshot,
 } from "./steps";
 
-const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+const TERMINAL_PROVIDER = new Set(["complete", "error", "canceled"]);
 
 type AttemptResult = "ready" | "retry" | "stop";
+type WaitResult = { kind: "event"; status: string } | { kind: "timeout" };
 
 export async function reelWorkflow(reelId: string): Promise<void> {
   "use workflow";
   try {
     await markReel(reelId, "editing");
-    const still = await produceStill(reelId, "kickflip");
-    if (still === "ready") {
+    const stills = await Promise.all([produceStill(reelId, "kickflip"), produceStill(reelId, "flyover")]);
+    const lock = await reelProviderLock(reelId);
+    if (stills.some((status) => status === "ready") && !lock) {
       await markReel(reelId, "animating");
-      await produceVideo(reelId, "kickflip");
+      await Promise.all([produceVideo(reelId, "kickflip"), produceVideo(reelId, "flyover")]);
     }
-    await markReel(reelId, await finishStatus(reelId));
+    await finishReel(reelId);
+    await alertReelFailureRate();
   } catch (error) {
     // A thrown step would otherwise leave the reel in editing and hold the active cap.
     await closeReel(reelId);
@@ -34,99 +41,155 @@ export async function reelWorkflow(reelId: string): Promise<void> {
   }
 }
 
-async function produceStill(reelId: string, key: SceneKey) {
-  const first = await runImageAttempt(reelId, key, false);
-  if (first === "ready") return "ready" as const;
-  if (first === "retry") {
-    const second = await runImageAttempt(reelId, key, true);
-    if (second === "ready") return "ready" as const;
+async function produceStill(reelId: string, key: SceneKey): Promise<"ready" | "failed"> {
+  try {
+    const first = await runImageAttempt(reelId, key, false);
+    if (first === "ready") return "ready";
+    if (first === "retry") {
+      const second = await runImageAttempt(reelId, key, true);
+      if (second === "ready") return "ready";
+    }
+    return "failed";
+  } catch {
+    try {
+      await markScene(reelId, key, { status: "failed", errorCode: "provider_error" });
+    } catch {
+      // Returning failed keeps Promise.all from rejecting the sibling scene.
+    }
+    return "failed";
   }
-  return "failed" as const;
 }
 
-async function produceVideo(reelId: string, key: SceneKey) {
-  const first = await runVideoAttempt(reelId, key, false);
-  if (first === "ready") return "ready" as const;
-  if (first === "retry") {
-    const second = await runVideoAttempt(reelId, key, true);
-    if (second === "ready") return "ready" as const;
+async function produceVideo(reelId: string, key: SceneKey): Promise<"ready" | "failed"> {
+  try {
+    const progress = await sceneSnapshot(reelId, key);
+    if (progress.status !== "still_ready") {
+      return progress.status === "complete" || progress.hasVideo ? "ready" : "failed";
+    }
+    const first = await runVideoAttempt(reelId, key, false);
+    if (first === "ready") return "ready";
+    if (first === "retry") {
+      const second = await runVideoAttempt(reelId, key, true);
+      if (second === "ready") return "ready";
+    }
+    return "failed";
+  } catch {
+    try {
+      await markScene(reelId, key, { status: "failed", errorCode: "provider_error" });
+    } catch {
+      // Returning failed keeps Promise.all from rejecting the sibling scene.
+    }
+    return "failed";
   }
-  return "failed" as const;
 }
 
 async function runImageAttempt(reelId: string, key: SceneKey, forceNew: boolean): Promise<AttemptResult> {
   const created = await createImageIfNeeded(reelId, key, { forceNew });
   if (!created.ok) return "stop";
-  const project = await pollProject(reelId, key, created.projectId, "image", created.requestedAt);
-  if (project.status === "complete" && project.downloads.length > 0) {
-    const saved = await saveStill(reelId, key, project.downloads[0].url);
-    if (!saved.ok) return "stop";
-    return "ready";
-  }
-  if (project.status === "timeout") {
+  const project = await waitForProject(created.projectId, created.requestedAt);
+  if (await stillAlreadySaved(reelId, key, project)) return "ready";
+  if (project.kind === "timeout") {
     await markScene(reelId, key, { status: "failed", errorCode: "timeout" });
     return "stop";
   }
-  if (project.status === "canceled" || project.status === "rejected") {
-    await markScene(reelId, key, { status: "failed", errorCode: "provider_error" });
-    return "stop";
+
+  let status = project.status;
+  let downloads: { url: string }[] = [];
+  if (status === "complete") {
+    const snapshot = await getProject(reelId, key, created.projectId, "image");
+    if (await stillAlreadySaved(reelId, key, project)) return "ready";
+    status = snapshot.status;
+    downloads = snapshot.downloads;
+    if (status === "complete" && downloads.length > 0) {
+      const saved = await saveStill(reelId, key, downloads[0].url);
+      if (!saved.ok) return "stop";
+      return "ready";
+    }
   }
-  if (!forceNew && (project.status === "error" || project.downloads.length === 0)) {
-    return "retry";
-  }
-  await markScene(reelId, key, {
-    status: "failed",
-    errorCode: project.downloads.length === 0 ? "download_failed" : "provider_error",
-  });
-  return "stop";
+  return settleAttempt(reelId, key, forceNew, status, downloads);
 }
 
 async function runVideoAttempt(reelId: string, key: SceneKey, forceNew: boolean): Promise<AttemptResult> {
   const created = await createVideoIfNeeded(reelId, key, { forceNew });
   if (!created.ok) return "stop";
-  const project = await pollProject(reelId, key, created.projectId, "video", created.requestedAt);
-  if (project.status === "complete" && project.downloads.length > 0) {
-    const saved = await saveVideo(reelId, key, project.downloads[0].url);
-    if (!saved.ok) return "stop";
-    return "ready";
-  }
-  if (project.status === "timeout") {
+  const project = await waitForProject(created.projectId, created.requestedAt);
+  if (await videoAlreadySaved(reelId, key, project)) return "ready";
+  if (project.kind === "timeout") {
     await markScene(reelId, key, { status: "failed", errorCode: "timeout" });
     return "stop";
   }
-  if (project.status === "canceled" || project.status === "rejected") {
+
+  let status = project.status;
+  let downloads: { url: string }[] = [];
+  if (status === "complete") {
+    const snapshot = await getProject(reelId, key, created.projectId, "video");
+    if (await videoAlreadySaved(reelId, key, project)) return "ready";
+    status = snapshot.status;
+    downloads = snapshot.downloads;
+    if (status === "complete" && downloads.length > 0) {
+      const saved = await saveVideo(reelId, key, downloads[0].url);
+      if (!saved.ok) return "stop";
+      return "ready";
+    }
+  }
+  return settleAttempt(reelId, key, forceNew, status, downloads);
+}
+
+async function stillAlreadySaved(reelId: string, key: SceneKey, project: WaitResult): Promise<boolean> {
+  if (project.kind === "timeout") {
+    const progress = await sceneSnapshot(reelId, key);
+    return progress.status === "still_ready" || progress.status === "complete" || progress.hasStill;
+  }
+  const progress = await sceneSnapshot(reelId, key);
+  return progress.status === "still_ready" || progress.status === "complete" || progress.hasStill;
+}
+
+async function videoAlreadySaved(reelId: string, key: SceneKey, project: WaitResult): Promise<boolean> {
+  if (project.kind === "timeout") {
+    const progress = await sceneSnapshot(reelId, key);
+    return progress.status === "complete" || progress.hasVideo;
+  }
+  const progress = await sceneSnapshot(reelId, key);
+  return progress.status === "complete" || progress.hasVideo;
+}
+
+async function settleAttempt(
+  reelId: string,
+  key: SceneKey,
+  forceNew: boolean,
+  status: string,
+  downloads: { url: string }[],
+): Promise<AttemptResult> {
+  if (status === "canceled" || status === "rejected") {
     await markScene(reelId, key, { status: "failed", errorCode: "provider_error" });
     return "stop";
   }
-  if (!forceNew && (project.status === "error" || project.downloads.length === 0)) {
+  if (!forceNew && (status === "error" || downloads.length === 0)) {
     return "retry";
   }
   await markScene(reelId, key, {
     status: "failed",
-    errorCode: project.downloads.length === 0 ? "download_failed" : "provider_error",
+    errorCode: downloads.length === 0 ? "download_failed" : "provider_error",
   });
   return "stop";
 }
 
-async function pollProject(
-  reelId: string,
-  key: SceneKey,
-  projectId: string,
-  kind: "image" | "video",
-  requestedAt: string,
-): Promise<{ status: "complete" | "error" | "canceled" | "rejected" | "timeout"; downloads: { url: string }[] }> {
+export async function waitForProject(projectId: string, requestedAtIso: string): Promise<WaitResult> {
+  "use workflow";
+  const hook = createHook<{ status: string }>({ token: `mh:${projectId}` });
   for (;;) {
-    const snapshot = await getProject(reelId, key, projectId, kind);
-    if (isTerminal(snapshot.status)) {
-      return { status: snapshot.status, downloads: snapshot.downloads };
+    const existing = await readTerminalEvent(projectId);
+    if (existing?.status === "timeout") return { kind: "timeout" };
+    if (existing && TERMINAL_PROVIDER.has(existing.status)) return { kind: "event", status: existing.status };
+    const raced = await Promise.race([
+      hook.then((event) => ({ kind: "hook" as const, status: event.status })),
+      sleep("30s").then(() => ({ kind: "tick" as const })),
+    ]);
+    if (raced.kind === "hook") {
+      if (raced.status === "timeout") return { kind: "timeout" };
+      if (TERMINAL_PROVIDER.has(raced.status)) return { kind: "event", status: raced.status };
     }
-    if (Date.parse(snapshot.now) - Date.parse(requestedAt) >= FIFTEEN_MINUTES_MS) {
-      return { status: "timeout", downloads: snapshot.downloads };
-    }
-    await sleep("15s");
+    const ageSec = await projectAgeSec(projectId, requestedAtIso);
+    if (ageSec > 15 * 60) return { kind: "timeout" };
   }
-}
-
-function isTerminal(status: ProjectSnapshot["status"]): status is "complete" | "error" | "canceled" | "rejected" {
-  return status === "complete" || status === "error" || status === "canceled" || status === "rejected";
 }

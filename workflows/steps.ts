@@ -1,8 +1,8 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { FatalError } from "workflow";
 import { readConfig } from "@/lib/config";
 import { db } from "@/lib/db/client";
-import { reelScenes, reels } from "@/lib/db/schema";
+import { providerEvents, reelScenes, reels } from "@/lib/db/schema";
 import { alert } from "@/lib/log";
 import { downloadAllowed } from "@/lib/magic-hour/download";
 import { createMagicHourClient, MagicHourHttpError, type MagicHourProject } from "@/lib/magic-hour/client";
@@ -58,6 +58,102 @@ export async function finishStatus(reelId: string): Promise<ReelStatus> {
   return deriveReelStatus(rows.map((row) => ({ status: row.status as SceneStatus })));
 }
 
+export async function finishReel(reelId: string): Promise<void> {
+  "use step";
+  const [reel] = await db
+    .select({ errorCode: reels.errorCode })
+    .from(reels)
+    .where(eq(reels.id, reelId))
+    .limit(1);
+  const locked = reel?.errorCode === "provider_auth" || reel?.errorCode === "provider_billing";
+  if (locked) {
+    const scenes = await db.select().from(reelScenes).where(eq(reelScenes.reelId, reelId));
+    for (const scene of scenes) {
+      if (scene.status === "complete" || scene.status === "failed") continue;
+      await db
+        .update(reelScenes)
+        .set({ status: "failed", errorCode: scene.errorCode && LOCKED_REEL_ERRORS.has(scene.errorCode) ? scene.errorCode : reel.errorCode })
+        .where(eq(reelScenes.id, scene.id));
+    }
+  }
+  const rows = await db
+    .select({ status: reelScenes.status })
+    .from(reelScenes)
+    .where(eq(reelScenes.reelId, reelId));
+  const derived = deriveReelStatus(rows.map((row) => ({ status: row.status as SceneStatus })));
+  const now = await postgresNow();
+  await db
+    .update(reels)
+    .set({ status: locked ? "failed" : derived, updatedAt: now })
+    .where(eq(reels.id, reelId));
+}
+
+export async function alertReelFailureRate(): Promise<void> {
+  "use step";
+  const rows = await db
+    .select({ status: reels.status })
+    .from(reels)
+    .where(inArray(reels.status, ["complete", "partial", "failed"]))
+    .orderBy(desc(reels.updatedAt))
+    .limit(20);
+  if (rows.length < 20) return;
+  const failed = rows.filter((row) => row.status === "failed").length;
+  if (failed / 20 > 0.5) alert("reel_failure_rate", { failed, total: 20 });
+}
+
+export async function reelProviderLock(reelId: string): Promise<"provider_auth" | "provider_billing" | null> {
+  "use step";
+  const [reel] = await db.select({ errorCode: reels.errorCode }).from(reels).where(eq(reels.id, reelId)).limit(1);
+  if (reel?.errorCode === "provider_auth" || reel?.errorCode === "provider_billing") return reel.errorCode;
+  return null;
+}
+
+export async function sceneSnapshot(
+  reelId: string,
+  key: SceneKey,
+): Promise<{ status: SceneStatus; hasStill: boolean; hasVideo: boolean }> {
+  "use step";
+  const scene = await loadScene(reelId, key);
+  return {
+    status: (scene?.status ?? "failed") as SceneStatus,
+    hasStill: Boolean(scene?.stillPath),
+    hasVideo: Boolean(scene?.videoPath),
+  };
+}
+
+const TERMINAL_PROVIDER_STATUSES = new Set(["complete", "error", "canceled"]);
+
+export async function readTerminalEvent(projectId: string): Promise<{ status: string } | null> {
+  "use step";
+  const rows = await db
+    .select({ status: providerEvents.status })
+    .from(providerEvents)
+    .where(eq(providerEvents.projectId, projectId))
+    .orderBy(desc(providerEvents.receivedAt));
+  const found = rows.find((row) => TERMINAL_PROVIDER_STATUSES.has(row.status) || row.status === "timeout");
+  if (!found) return null;
+  return { status: found.status };
+}
+
+export async function projectAgeSec(projectId: string, requestedAtIso: string): Promise<number> {
+  "use step";
+  const now = await postgresNow();
+  const [scene] = await db
+    .select({
+      imageProjectId: reelScenes.imageProjectId,
+      videoProjectId: reelScenes.videoProjectId,
+      imageRequestedAt: reelScenes.imageRequestedAt,
+      videoRequestedAt: reelScenes.videoRequestedAt,
+    })
+    .from(reelScenes)
+    .where(or(eq(reelScenes.imageProjectId, projectId), eq(reelScenes.videoProjectId, projectId)))
+    .limit(1);
+  const stored = scene?.imageProjectId === projectId ? scene.imageRequestedAt : scene?.videoRequestedAt;
+  const requestedMs = stored ? stored.getTime() : Date.parse(requestedAtIso);
+  if (!Number.isFinite(requestedMs)) return 0;
+  return (now.getTime() - requestedMs) / 1000;
+}
+
 export async function createImageIfNeeded(
   reelId: string,
   key: SceneKey,
@@ -71,7 +167,12 @@ export async function createImageIfNeeded(
   }
 
   const reel = await loadReel(reelId);
-  if (!reel?.sourcePath || !isSourcePath(reel.sourcePath)) {
+  if (!reel) return failMissingScene(reelId);
+  if (isProviderLock(reel.errorCode)) {
+    await failScene(reelId, key, reel.errorCode);
+    return { ok: false };
+  }
+  if (!reel.sourcePath || !isSourcePath(reel.sourcePath)) {
     await failScene(reelId, key, "provider_error");
     return { ok: false };
   }
@@ -86,6 +187,12 @@ export async function createImageIfNeeded(
     const settled = await settleHttpFailure(error, reelId, key);
     if (settled) return settled;
     throw error;
+  }
+
+  const beforePost = await loadReel(reelId);
+  if (beforePost && isProviderLock(beforePost.errorCode)) {
+    await failScene(reelId, key, beforePost.errorCode);
+    return { ok: false };
   }
 
   try {
@@ -118,6 +225,12 @@ export async function createVideoIfNeeded(
   if (!scene) return failMissingScene(reelId);
   if (scene.videoProjectId && scene.videoRequestedAt && !options.forceNew) {
     return { ok: true, projectId: scene.videoProjectId, requestedAt: scene.videoRequestedAt.toISOString() };
+  }
+  const reel = await loadReel(reelId);
+  if (!reel) return failMissingScene(reelId);
+  if (isProviderLock(reel.errorCode)) {
+    await failScene(reelId, key, reel.errorCode);
+    return { ok: false };
   }
   if (!scene.imageProjectId) {
     await failScene(reelId, key, "provider_error");
@@ -400,9 +513,13 @@ export async function closeReel(reelId: string): Promise<void> {
     .where(eq(reels.id, reelId));
 }
 
+function isProviderLock(code: string | null | undefined): code is "provider_auth" | "provider_billing" {
+  return code === "provider_auth" || code === "provider_billing";
+}
+
 async function loadReel(reelId: string) {
   const [reel] = await db
-    .select({ sourcePath: reels.sourcePath })
+    .select({ sourcePath: reels.sourcePath, errorCode: reels.errorCode })
     .from(reels)
     .where(eq(reels.id, reelId))
     .limit(1);
