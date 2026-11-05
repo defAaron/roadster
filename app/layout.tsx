@@ -4,6 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Roadster",
+  description: "See your car do the kickflip and the flyover.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

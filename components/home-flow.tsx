@@ -51,6 +51,8 @@ export function HomeFlow() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [warnings, setWarnings] = useState<Array<"dark" | "cropped">>([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [pending, setPending] = useState(false);
 
   function clearPreview() {
     setPreviewUrl("");
@@ -62,20 +64,24 @@ export function HomeFlow() {
     if (!file) return;
     const ticket = ++generation.current;
     starting.current = false;
+    setPending(false);
 
     if (file.size > MAX_BYTES) {
       setFileError(userError("file_too_large"));
       clearPreview();
+      setUploading(false);
       return;
     }
     if (!isAllowedPhoto(file)) {
       setFileError(userError("unsupported_type"));
       clearPreview();
+      setUploading(false);
       return;
     }
 
     setFileError(null);
     clearPreview();
+    setUploading(true);
     const body = new FormData();
     body.set("file", file);
     let response: Response;
@@ -83,11 +89,13 @@ export function HomeFlow() {
       response = await fetch("/api/uploads", { method: "POST", body });
     } catch {
       if (ticket !== generation.current) return;
+      setUploading(false);
       setFileError(userError("provider_error"));
       return;
     }
     const payload: unknown = await response.json().catch(() => null);
     if (ticket !== generation.current) return;
+    setUploading(false);
     const uploaded = uploadPayload(payload);
     if (!response.ok || !uploaded) {
       setFileError(userError(errorCode(payload)));
@@ -102,6 +110,7 @@ export function HomeFlow() {
   async function startReel() {
     if (!sourceId || starting.current) return;
     starting.current = true;
+    setPending(true);
     setFileError(null);
     let response: Response;
     try {
@@ -112,12 +121,14 @@ export function HomeFlow() {
       });
     } catch {
       starting.current = false;
+      setPending(false);
       setFileError(userError("provider_error"));
       return;
     }
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok || !payload || typeof payload !== "object" || typeof (payload as { id?: unknown }).id !== "string") {
       starting.current = false;
+      setPending(false);
       setFileError(userError(errorCode(payload)));
       return;
     }
@@ -126,21 +137,38 @@ export function HomeFlow() {
 
   return (
     <div className="mt-8">
-      {fileError ? <p className="mb-3">{fileError}</p> : null}
-      <input
-        id="car-photo"
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-        aria-label="Car photo"
-        onChange={(event) => {
-          const input = event.currentTarget;
-          const selected = input.files?.[0];
-          input.value = "";
-          void acceptFile(selected);
-        }}
-      />
+      {fileError ? (
+        <p className="mb-3 text-sm text-[var(--copper)]" role="alert">
+          {fileError}
+        </p>
+      ) : null}
+      <label
+        htmlFor="car-photo"
+        className="relative flex w-full cursor-pointer items-center justify-between gap-4 border border-[var(--line)] bg-white px-3 py-2.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-solid focus-within:[outline-color:var(--copper)]"
+      >
+        <span>{uploading ? "Reading the photo…" : "Choose a photo"}</span>
+        <span className="shrink-0 text-sm text-[var(--quiet)]">JPEG, PNG, WebP, HEIC</span>
+        <input
+          id="car-photo"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+          aria-label="Car photo"
+          className="sr-only"
+          onChange={(event) => {
+            const input = event.currentTarget;
+            const selected = input.files?.[0];
+            input.value = "";
+            void acceptFile(selected);
+          }}
+        />
+      </label>
       {previewUrl ? (
-        <ConfirmPanel previewUrl={previewUrl} warnings={warnings} onStart={() => void startReel()} />
+        <ConfirmPanel
+          previewUrl={previewUrl}
+          warnings={warnings}
+          pending={pending}
+          onStart={() => void startReel()}
+        />
       ) : null}
     </div>
   );
