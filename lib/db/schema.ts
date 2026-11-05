@@ -52,6 +52,7 @@ export const reels = pgTable("reels", {
   sessionId: text("session_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  magicHourKeyCiphertext: text("magic_hour_key_ciphertext"),
 });
 
 export const reelScenes = pgTable(

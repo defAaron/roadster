@@ -23,7 +23,6 @@ test("defaults match the PRD caps and pinned models", () => {
   expect(config.retryPerHour).toBe(10);
   expect(config.downloadHosts).toEqual(["videos.magichour.ai"]);
   expect(config.reelDriver).toBe("fake");
-  expect(config.magicHourApiKey).toBe("");
   expect(config.magicHourWebhookSecret).toBe("");
   expect(config.cronSecret).toBe("");
   expect(config.imaginCustomerKey).toBe("");
@@ -61,11 +60,13 @@ test("an unset reel driver defaults to fake and still requires storage", () => {
   ).toThrow(/DATABASE_URL/);
 });
 
-test("live driver requires the magic hour key and fake does not", () => {
-  expect(() => readConfig({ ...fakeEnv, REEL_DRIVER: "live" })).toThrow(/MAGIC_HOUR_API_KEY/);
-  const live = readConfig({ ...fakeEnv, REEL_DRIVER: "live", MAGIC_HOUR_API_KEY: "mh-key" });
-  expect(live.magicHourApiKey).toBe("mh-key");
+test("live driver does not require a server magic hour key", () => {
+  const live = readConfig({ ...fakeEnv, REEL_DRIVER: "live" });
   expect(live.reelDriver).toBe("live");
+  expect(live).not.toHaveProperty("magicHourApiKey");
+  const withEnvKey = readConfig({ ...fakeEnv, REEL_DRIVER: "live", MAGIC_HOUR_API_KEY: "mh-key" });
+  expect(withEnvKey.reelDriver).toBe("live");
+  expect(JSON.stringify(withEnvKey)).not.toContain("mh-key");
 });
 
 test("parses integer overrides and splits download hosts", () => {

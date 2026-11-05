@@ -1,7 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { and, eq, lt, sql } from "drizzle-orm";
 import { readConfig } from "@/lib/config";
-import { createMagicHourClient, MagicHourHttpError } from "@/lib/magic-hour/client";
+import { MagicHourHttpError } from "@/lib/magic-hour/client";
+import { magicHourClientFromCiphertext } from "@/lib/magic-hour/stored-key";
 import type { SceneKey } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -16,6 +17,7 @@ type StaleProject = {
   scene_key: string;
   project_id: string;
   requested_at: Date | string | null;
+  key_ciphertext: string | null;
 };
 
 function authorized(authorization: string | null): boolean {
@@ -79,16 +81,12 @@ export async function pollMagicHour(): Promise<void> {
   await db.delete(rateBuckets).where(lt(rateBuckets.windowStart, sql`now() - interval '2 days'`));
 
   const config = readConfig(process.env);
-  const client = createMagicHourClient({
-    apiKey: config.magicHourApiKey,
-    imageModel: config.imageModel,
-    videoModel: config.videoModel,
-    downloadHosts: config.downloadHosts,
-  });
 
   const images = await db.execute<StaleProject>(sql`
-    select s.id as scene_id, s.reel_id, s.scene_key, s.image_project_id as project_id, s.image_requested_at as requested_at
+    select s.id as scene_id, s.reel_id, s.scene_key, s.image_project_id as project_id, s.image_requested_at as requested_at,
+      r.magic_hour_key_ciphertext as key_ciphertext
     from reel_scenes s
+    inner join reels r on r.id = s.reel_id
     where s.status = 'editing'
       and s.image_project_id is not null
       and coalesce(
@@ -97,8 +95,10 @@ export async function pollMagicHour(): Promise<void> {
       ) < now() - interval '90 seconds'
   `);
   const videos = await db.execute<StaleProject>(sql`
-    select s.id as scene_id, s.reel_id, s.scene_key, s.video_project_id as project_id, s.video_requested_at as requested_at
+    select s.id as scene_id, s.reel_id, s.scene_key, s.video_project_id as project_id, s.video_requested_at as requested_at,
+      r.magic_hour_key_ciphertext as key_ciphertext
     from reel_scenes s
+    inner join reels r on r.id = s.reel_id
     where s.status = 'animating'
       and s.video_project_id is not null
       and coalesce(
@@ -115,46 +115,49 @@ export async function pollMagicHour(): Promise<void> {
   for (const job of jobs) {
     const key = sceneKey(job.row.scene_key);
     if (!key || !job.row.project_id) continue;
+    const client = magicHourClientFromCiphertext(job.row.key_ciphertext, config);
     let terminal = false;
-    try {
-      const project =
-        job.kind === "image"
-          ? await client.getImage(job.row.project_id, { reelId: job.row.reel_id, sceneKey: key })
-          : await client.getVideo(job.row.project_id, { reelId: job.row.reel_id, sceneKey: key });
-      if (TERMINAL.has(project.status)) {
-        terminal = true;
-        await db
-          .insert(providerEvents)
-          .values({
-            projectId: project.id,
-            eventType: eventType(job.kind, project.status),
-            status: project.status,
-            payload: {
-              id: project.id,
+    if (client) {
+      try {
+        const project =
+          job.kind === "image"
+            ? await client.getImage(job.row.project_id, { reelId: job.row.reel_id, sceneKey: key })
+            : await client.getVideo(job.row.project_id, { reelId: job.row.reel_id, sceneKey: key });
+        if (TERMINAL.has(project.status)) {
+          terminal = true;
+          await db
+            .insert(providerEvents)
+            .values({
+              projectId: project.id,
+              eventType: eventType(job.kind, project.status),
               status: project.status,
-              credits_charged: project.creditsCharged,
-              downloads: project.downloads.map((item) => ({
-                url: item.url,
-                expires_at: item.expiresAt,
-              })),
-              error: project.error,
-            },
-          })
-          .onConflictDoNothing();
-        await resume(project.id, project.status);
+              payload: {
+                id: project.id,
+                status: project.status,
+                credits_charged: project.creditsCharged,
+                downloads: project.downloads.map((item) => ({
+                  url: item.url,
+                  expires_at: item.expiresAt,
+                })),
+                error: project.error,
+              },
+            })
+            .onConflictDoNothing();
+          await resume(project.id, project.status);
+        }
+      } catch (error) {
+        const httpStatus = error instanceof MagicHourHttpError ? error.status : null;
+        console.error(
+          JSON.stringify({
+            level: "error",
+            operation: "magic_hour_poll",
+            reel_id: job.row.reel_id,
+            scene_key: key,
+            project_id: job.row.project_id,
+            http_status: httpStatus,
+          }),
+        );
       }
-    } catch (error) {
-      const httpStatus = error instanceof MagicHourHttpError ? error.status : null;
-      console.error(
-        JSON.stringify({
-          level: "error",
-          operation: "magic_hour_poll",
-          reel_id: job.row.reel_id,
-          scene_key: key,
-          project_id: job.row.project_id,
-          http_status: httpStatus,
-        }),
-      );
     }
     if (terminal || ageSec(job.row.requested_at, now) <= FIFTEEN_MINUTES_SEC) continue;
     await db

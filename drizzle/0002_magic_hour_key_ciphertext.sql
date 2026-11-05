@@ -1,0 +1,1 @@
+ALTER TABLE "reels" ADD COLUMN "magic_hour_key_ciphertext" text;

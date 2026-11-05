@@ -2,11 +2,13 @@ import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { FatalError } from "workflow";
 import { readConfig } from "@/lib/config";
 import { db } from "@/lib/db/client";
+import { loadMagicHourKeyCiphertext } from "@/lib/db/reels";
 import { providerEvents, reelScenes, reels, vehicles } from "@/lib/db/schema";
 import { alert } from "@/lib/log";
 import { isUuid } from "@/lib/http/session";
 import { downloadAllowed } from "@/lib/magic-hour/download";
-import { createMagicHourClient, MagicHourHttpError, type MagicHourProject } from "@/lib/magic-hour/client";
+import { MagicHourHttpError, type MagicHourProject } from "@/lib/magic-hour/client";
+import { magicHourClientFromCiphertext } from "@/lib/magic-hour/stored-key";
 import { deriveReelStatus } from "@/lib/reel-status";
 import { reelObjectStore } from "@/lib/reels/store";
 import { identityLine, scenePrompts } from "@/lib/scenes";
@@ -204,7 +206,7 @@ export async function createImageIfNeeded(
   }
 
   const attempt = options.forceNew ? scene.attempt + 1 : scene.attempt;
-  const client = magicClient();
+  const client = await magicClient(reelId);
   let filePath: string;
   try {
     const jpeg = await reelObjectStore().get(reel.sourcePath);
@@ -275,7 +277,7 @@ export async function createVideoIfNeeded(
     return { ok: false };
   }
 
-  const client = magicClient();
+  const client = await magicClient(reelId);
   let imageFilePath: string;
   try {
     const jpeg = await reelObjectStore().get(stillPath);
@@ -315,9 +317,9 @@ export async function getProject(
   kind: "image" | "video",
 ): Promise<ProjectSnapshot> {
   "use step";
-  const client = magicClient();
   const context = { reelId, sceneKey: key };
   try {
+    const client = await magicClient(reelId);
     const project =
       kind === "image" ? await client.getImage(projectId, context) : await client.getVideo(projectId, context);
     return {
@@ -381,7 +383,7 @@ async function loadResultBytes(
     return null;
   }
   try {
-    const client = magicClient();
+    const client = await magicClient(reelId);
     const context = { reelId, sceneKey: key, attempt: scene?.attempt };
     const project =
       kind === "image" ? await client.getImage(projectId, context) : await client.getVideo(projectId, context);
@@ -614,12 +616,9 @@ function clip(value: string | null): string | null {
   return value.slice(0, 500);
 }
 
-function magicClient() {
+async function magicClient(reelId: string) {
   const config = readConfig(process.env);
-  return createMagicHourClient({
-    apiKey: config.magicHourApiKey,
-    imageModel: config.imageModel,
-    videoModel: config.videoModel,
-    downloadHosts: config.downloadHosts,
-  });
+  const client = magicHourClientFromCiphertext(await loadMagicHourKeyCiphertext(reelId), config);
+  if (!client) throw new FatalError("Missing stored Magic Hour key");
+  return client;
 }

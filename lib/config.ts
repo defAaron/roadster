@@ -5,7 +5,6 @@ export type AppConfig = {
   databaseUrl: string;
   supabaseUrl: string;
   supabaseServiceRoleKey: string;
-  magicHourApiKey: string;
   magicHourWebhookSecret: string;
   imaginCustomerKey: string;
   ipHashSalt: string;
@@ -67,17 +66,11 @@ export function readConfig(env: Env): AppConfig {
     throw new Error(`Invalid REEL_DRIVER ${driverRaw}`);
   }
 
-  const magicHourApiKey = env.MAGIC_HOUR_API_KEY?.trim() ?? "";
-  if (driverRaw === "live" && magicHourApiKey === "") {
-    throw new Error("Missing MAGIC_HOUR_API_KEY");
-  }
-
   return {
     reelDriver: driverRaw,
     databaseUrl: required(env, "DATABASE_URL"),
     supabaseUrl: required(env, "SUPABASE_URL"),
     supabaseServiceRoleKey: required(env, "SUPABASE_SERVICE_ROLE_KEY"),
-    magicHourApiKey,
     magicHourWebhookSecret: optional(env, "MAGIC_HOUR_WEBHOOK_SECRET"),
     imaginCustomerKey: optional(env, "IMAGIN_CUSTOMER_KEY"),
     ipHashSalt: required(env, "IP_HASH_SALT"),

@@ -54,6 +54,7 @@ export async function createReelFromSource(input: {
   ipHash: string;
   sessionId: string;
   now: Date;
+  magicHourKeyCiphertext: string | null;
 }): Promise<{ ok: true } | { ok: false; errorCode: "daily_cap" | "reel_in_progress" | "not_found" }> {
   return db.transaction(async (tx) => {
     const gate = await assertCanCreateReel(
@@ -76,6 +77,7 @@ export async function createReelFromSource(input: {
       sourcePath: input.sourcePath,
       ipHash: input.ipHash,
       sessionId: input.sessionId,
+      magicHourKeyCiphertext: input.magicHourKeyCiphertext,
       createdAt: input.now,
       updatedAt: input.now,
     });
@@ -104,6 +106,7 @@ export async function createReelFromCatalog(input: {
   ipHash: string;
   sessionId: string;
   now: Date;
+  magicHourKeyCiphertext: string | null;
 }): Promise<{ ok: true } | { ok: false; errorCode: "daily_cap" | "reel_in_progress" }> {
   return db.transaction(async (tx) => {
     const gate = await assertCanCreateReel(
@@ -120,6 +123,7 @@ export async function createReelFromCatalog(input: {
       sourcePath: input.sourcePath,
       ipHash: input.ipHash,
       sessionId: input.sessionId,
+      magicHourKeyCiphertext: input.magicHourKeyCiphertext,
       createdAt: input.now,
       updatedAt: input.now,
     });
@@ -139,6 +143,15 @@ export async function createReelFromCatalog(input: {
     ]);
     return { ok: true };
   });
+}
+
+export async function loadMagicHourKeyCiphertext(reelId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ magicHourKeyCiphertext: reels.magicHourKeyCiphertext })
+    .from(reels)
+    .where(eq(reels.id, reelId))
+    .limit(1);
+  return row?.magicHourKeyCiphertext ?? null;
 }
 
 export type LoadedScene = {

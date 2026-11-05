@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmPanel } from "@/components/confirm-panel";
+import { useMagicHourKey } from "@/components/magic-hour-key";
 import { userError } from "@/lib/copy";
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -45,6 +46,7 @@ function uploadPayload(payload: unknown): { sourceId: string; previewUrl: string
 
 export function HomeFlow() {
   const router = useRouter();
+  const readMagicHourKey = useMagicHourKey();
   const generation = useRef(0);
   const starting = useRef(false);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -109,6 +111,8 @@ export function HomeFlow() {
 
   async function startReel() {
     if (!sourceId || starting.current) return;
+    const magicHourApiKey = readMagicHourKey();
+    if (magicHourApiKey == null) return;
     starting.current = true;
     setPending(true);
     setFileError(null);
@@ -117,7 +121,7 @@ export function HomeFlow() {
       response = await fetch("/api/reels", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sourceId }),
+        body: JSON.stringify({ sourceId, magicHourApiKey }),
       });
     } catch {
       starting.current = false;

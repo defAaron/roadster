@@ -29,6 +29,7 @@ export const USER_ERRORS: Record<string, string> = {
   download_failed: "This scene failed. You can try it again.",
   not_found: "This reel does not exist.",
   rate_limited: "Too many requests. Wait a moment and try again.",
+  missing_api_key: "Add your Magic Hour API key.",
 };
 
 export function userError(code: string | null): string {

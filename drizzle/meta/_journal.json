@@ -15,6 +15,13 @@
       "when": 1793741969152,
       "tag": "0001_tan_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793920395664,
+      "tag": "0002_magic_hour_key_ciphertext",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmPanel } from "@/components/confirm-panel";
+import { useMagicHourKey } from "@/components/magic-hour-key";
 import { userError } from "@/lib/copy";
 
 type Suggestion = { id: string; label: string };
@@ -42,6 +43,7 @@ function readReelId(payload: unknown): string | null {
 
 export function CatalogSearch() {
   const router = useRouter();
+  const readMagicHourKey = useMagicHourKey();
   const generation = useRef(0);
   const starting = useRef(false);
   const skipQuery = useRef<string | null>(null);
@@ -152,6 +154,8 @@ export function CatalogSearch() {
 
   async function startReel() {
     if (!vehicleId || starting.current) return;
+    const magicHourApiKey = readMagicHourKey();
+    if (magicHourApiKey == null) return;
     const confirmedId = vehicleId;
     const ticket = generation.current;
     starting.current = true;
@@ -163,7 +167,7 @@ export function CatalogSearch() {
       response = await fetch("/api/reels", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ vehicleId: confirmedId }),
+        body: JSON.stringify({ vehicleId: confirmedId, magicHourApiKey }),
       });
     } catch {
       if (ticket !== generation.current) return;
