@@ -3,14 +3,14 @@ const SHARED =
 
 const STILL = {
   kickflip:
-    "The car is at the apex of a single skateboard-style kickflip, sideways in the air, wheels clear, cold-gas plume trailing.",
+    "The car itself is tilted in mid-air, wheels clear of the ground. A dense white steam plume shoots from the underside of the car. The air under the car is empty.",
   flyover:
     "The car is level, a few meters up, passing over the roofs of a row of ordinary parked cars (a sedan, an SUV, a pickup, and a van), cold-gas plume visible.",
 } as const;
 
 const MOTION = {
   kickflip:
-    "The car drives forward, launches on its cold-gas thrusters, completes one kickflip about its long axis, lands on its wheels, and keeps moving. The camera tracks from the side. One maneuver, no jump cut.",
+    "The car drives forward, lifts off the ground, tilts through one full rotation about its long axis. A dense white steam plume shoots from the underside during the rotation. It lands on its wheels and keeps moving. The camera tracks from the side. One maneuver, no jump cut. The air under the car stays empty during the rotation.",
   flyover:
     "The car drives toward a row of ordinary parked cars, lifts, stays roughly level, clears their roofs, and sets down on the far side. The camera tracks from the side. One maneuver, no jump cut. The parked cars are a sedan, an SUV, a pickup, and a van, not a Tesla lineup.",
 } as const;

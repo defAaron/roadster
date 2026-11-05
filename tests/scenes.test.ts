@@ -17,11 +17,18 @@ test("catalog identity has year make and model and no color word", () => {
   expect(identityLine({ kind: "catalog", year: 2018, make: "Honda", model: "Civic" })).toBe("A 2018 Honda Civic.");
 });
 
-test("kickflip prompts name one flip and a landing", () => {
+test("kickflip prompts tilt the car itself with underside steam", () => {
   const { stillPrompt, motionPrompt } = scenePrompts("kickflip", "The car in the source photo.");
-  expect(stillPrompt).toContain("apex of a single skateboard-style kickflip");
-  expect(motionPrompt).toContain("one kickflip about its long axis");
-  expect(motionPrompt).toContain("lands on its wheels");
+  expect(stillPrompt).toContain("The car itself is tilted in mid-air, wheels clear of the ground.");
+  expect(stillPrompt).toContain("A dense white steam plume shoots from the underside of the car.");
+  expect(stillPrompt).toContain("The air under the car is empty.");
+  expect(motionPrompt).toContain(
+    "The car drives forward, lifts off the ground, tilts through one full rotation about its long axis.",
+  );
+  expect(motionPrompt).toContain("A dense white steam plume shoots from the underside during the rotation.");
+  expect(motionPrompt).toContain("It lands on its wheels and keeps moving.");
+  expect(motionPrompt).toContain("The camera tracks from the side. One maneuver, no jump cut.");
+  expect(motionPrompt).toContain("The air under the car stays empty during the rotation.");
   for (const rule of rules) {
     expect(stillPrompt).toContain(rule);
     expect(motionPrompt).toContain(rule);
