@@ -6,9 +6,15 @@ function sceneKey(stage: 1 | 2 | 3 | 4): SceneKey {
   return stage === 1 || stage === 3 ? "kickflip" : "flyover";
 }
 
+function rowClass(state: "waiting" | "active" | "done" | "failed") {
+  if (state === "waiting") return "text-sm text-[var(--quiet)]";
+  if (state === "failed") return "text-sm text-[var(--copper)]";
+  return "text-sm";
+}
+
 export function ReelProgress({ reel }: { reel: ReelView }) {
   return (
-    <ol>
+    <ol className="mt-8 list-none space-y-1.5">
       {STAGE_LABELS.map((label, index) => {
         const stage = index as StageId;
         const state = stageDot(reel, stage);
@@ -17,8 +23,8 @@ export function ReelProgress({ reel }: { reel: ReelView }) {
             ? userError(reel.scenes.find((scene) => scene.key === sceneKey(stage))?.errorCode ?? null)
             : null;
         return (
-          <li key={stage} data-state={state}>
-            {label}
+          <li key={stage} data-state={state} className={rowClass(state)}>
+            {state === "active" ? `Now — ${label}` : label}
             {error ? ` ${error}` : null}
           </li>
         );

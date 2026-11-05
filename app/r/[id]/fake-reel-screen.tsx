@@ -18,6 +18,7 @@ function isReelView(value: unknown): value is ReelView {
 export function ReelScreen({ id }: { id: string }) {
   const [reel, setReel] = useState<ReelView | null>(null);
   const [missing, setMissing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [retryNotice, setRetryNotice] = useState<{ sceneKey: SceneKey; message: string } | null>(null);
   const [pollGeneration, setPollGeneration] = useState(0);
   const mounted = useRef(true);
@@ -41,18 +42,24 @@ export function ReelScreen({ id }: { id: string }) {
       try {
         response = await fetch(`/api/reels/${encodeURIComponent(id)}`);
       } catch {
+        if (!stopped) setLoadFailed(true);
         return;
       }
       if (stopped) return;
       if (response.status === 404) {
         stopped = true;
         window.clearInterval(timer);
+        setLoadFailed(false);
         setMissing(true);
         return;
       }
-      if (!response.ok) return;
+      if (!response.ok) {
+        setLoadFailed(true);
+        return;
+      }
       const payload: unknown = await response.json().catch(() => null);
       if (stopped || !isReelView(payload)) return;
+      setLoadFailed(false);
       setReel(payload);
       if (isTerminal(payload.status)) {
         stopped = true;
@@ -110,10 +117,30 @@ export function ReelScreen({ id }: { id: string }) {
   }
 
   if (missing) {
-    return <h1>This reel does not exist.</h1>;
+    return (
+      <main className="mx-auto max-w-xl px-5 py-14">
+        <a href="/" className="text-sm text-[var(--quiet)] underline decoration-[var(--line)] underline-offset-4">
+          Roadster
+        </a>
+        <h1 className="mt-6 text-4xl">This reel does not exist.</h1>
+      </main>
+    );
   }
 
-  if (!reel) return null;
+  if (!reel) {
+    return (
+      <main className="mx-auto max-w-xl px-5 py-14">
+        <a href="/" className="text-sm text-[var(--quiet)] underline decoration-[var(--line)] underline-offset-4">
+          Roadster
+        </a>
+        {loadFailed ? (
+          <p className="mt-6 text-sm text-[var(--copper)]">This reel failed. You can try again later.</p>
+        ) : (
+          <p className="mt-6 text-sm text-[var(--quiet)]">Opening the reel…</p>
+        )}
+      </main>
+    );
+  }
 
   return (
     <ResultView
