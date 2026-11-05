@@ -102,7 +102,7 @@ test("createVideo omits end_image_file_path when the end path is omitted", async
       audio: false,
       model: "kling-3.0",
       style: { prompt: "motion prompt" },
-      assets: { image_file_path: "https://magichour.ai/my-library?imageId=img_1" },
+      assets: { image_file_path: "api-assets/kickflip.jpg" },
     });
     expect(body.assets).not.toHaveProperty("end_image_file_path");
     expect(JSON.stringify(body)).not.toContain("end_image_file_path");
@@ -112,7 +112,7 @@ test("createVideo omits end_image_file_path when the end path is omitted", async
   const created = await client(fetchImpl).createVideo({
     name: "reel_1_kickflip",
     prompt: "motion prompt",
-    imageFilePath: "https://magichour.ai/my-library?imageId=img_1",
+    imageFilePath: "api-assets/kickflip.jpg",
   });
   expect(created).toEqual({ id: "vid_1", creditsCharged: 9 });
 });

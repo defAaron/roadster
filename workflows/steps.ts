@@ -269,13 +269,29 @@ export async function createVideoIfNeeded(
   }
 
   const attempt = options.forceNew ? scene.attempt + 1 : scene.attempt;
+  const stillPath = `results/${reelId}/${key}.jpg`;
+  if (scene.stillPath !== stillPath) {
+    await failScene(reelId, key, "provider_error");
+    return { ok: false };
+  }
+
+  const client = magicClient();
+  let imageFilePath: string;
   try {
-    const client = magicClient();
+    const jpeg = await reelObjectStore().get(stillPath);
+    imageFilePath = await client.uploadImage(jpeg, { reelId, sceneKey: key, attempt });
+  } catch (error) {
+    const settled = await settleHttpFailure(error, reelId, key);
+    if (settled) return settled;
+    throw error;
+  }
+
+  try {
     const { motionPrompt } = scenePrompts(key, identity);
     const created = await client.createVideo({
       name: `reel_${reelId}_${key}`,
       prompt: motionPrompt,
-      imageFilePath: `https://magichour.ai/my-library?imageId=${scene.imageProjectId}`,
+      imageFilePath,
       reelId,
       sceneKey: key,
       attempt,
