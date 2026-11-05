@@ -1,5 +1,6 @@
-# Agent-specific docs
-docs/
+# Agent-specific docs. The grading checklist is the product record of the first 30 reels.
+docs/*
+!docs/grading.md
 .cursor/
 node_modules
 .next
