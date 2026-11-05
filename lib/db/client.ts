@@ -2,7 +2,20 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-const client = postgres(process.env.DATABASE_URL!);
+const client = postgres(databaseUrl(process.env.DATABASE_URL));
+
+function databaseUrl(raw: string | undefined): string {
+  if (!raw) throw new Error("Missing DATABASE_URL");
+  if (/sslmode=/i.test(raw)) return raw;
+  let host = "";
+  try {
+    host = new URL(raw.replace(/^postgres(ql)?:/, "http:")).hostname;
+  } catch {
+    return raw;
+  }
+  if (host === "localhost" || host === "127.0.0.1") return raw;
+  return `${raw}${raw.includes("?") ? "&" : "?"}sslmode=require`;
+}
 
 export const db = drizzle(client, { schema });
 
