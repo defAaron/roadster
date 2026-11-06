@@ -135,11 +135,26 @@ h2 {
 }
 
 .section-heading label,
-.section-heading h2 {
+.section-heading h2,
+.section-heading a {
   display: block;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.015em;
+}
+
+.section-heading a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.magic-hour-credit {
+  margin: 20px 0 0;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 11px;
+  color: #8a8c86;
+  text-align: center;
 }
 
 .section-heading p {

@@ -54,9 +54,14 @@ export function MagicHourKeyField({ children }: { children: ReactNode }) {
       <section className="key-section" aria-labelledby="api-key-label">
         <div className="section-heading">
           <div>
-            <label id="api-key-label" htmlFor="magic-hour-api-key">
-              Connect your API key
-            </label>
+            <a
+              id="api-key-label"
+              href="https://magichour.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Connect your Magic Hour API key
+            </a>
             <p>Stored only for this session</p>
           </div>
         </div>
@@ -69,6 +74,7 @@ export function MagicHourKeyField({ children }: { children: ReactNode }) {
             type={showKey ? "text" : "password"}
             autoComplete="off"
             spellCheck={false}
+            aria-label="Magic Hour API key"
             value={magicHourApiKey}
             placeholder="mhk_live_••••••••••••••••"
             onChange={(event) => {
@@ -93,6 +99,7 @@ export function MagicHourKeyField({ children }: { children: ReactNode }) {
         ) : null}
       </section>
       {children}
+      <p className="magic-hour-credit">Built using Magic Hour AI's API</p>
     </MagicHourKeyContext.Provider>
   );
 }
