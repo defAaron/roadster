@@ -1,4 +1,3 @@
-import { CatalogSearch } from "@/components/catalog-search";
 import { CreationFrame } from "@/components/creation-frame";
 import { HomeFlow } from "@/components/home-flow";
 import { MagicHourKeyField } from "@/components/magic-hour-key";
@@ -25,11 +24,10 @@ export default function HomePage() {
               <div className="section-heading">
                 <div>
                   <h2 id="input-label">Choose your starting point</h2>
-                  <p>Use words or an image reference</p>
+                  <p>Use a photo of your car</p>
                 </div>
               </div>
               <div className="creation-input">
-                <CatalogSearch />
                 <HomeFlow />
               </div>
             </section>

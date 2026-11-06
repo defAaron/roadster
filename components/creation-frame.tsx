@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
-type Slot = "photo" | "catalog";
+type Slot = "photo";
 
 type BeginSource = {
   ready: boolean;
@@ -43,10 +43,9 @@ function ArrowIcon() {
 export function CreationFrame({ children }: { children: ReactNode }) {
   const starts = useRef<Record<Slot, () => void>>({
     photo: () => {},
-    catalog: () => {},
   });
-  const [ready, setReady] = useState<Record<Slot, boolean>>({ photo: false, catalog: false });
-  const [pending, setPending] = useState<Record<Slot, boolean>>({ photo: false, catalog: false });
+  const [ready, setReady] = useState<Record<Slot, boolean>>({ photo: false });
+  const [pending, setPending] = useState<Record<Slot, boolean>>({ photo: false });
   const [active, setActive] = useState<Slot | null>(null);
   const [hint, setHint] = useState<string | null>(null);
 
@@ -60,13 +59,12 @@ export function CreationFrame({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const slot: Slot | null =
-    active && ready[active] ? active : ready.photo ? "photo" : ready.catalog ? "catalog" : null;
+  const slot: Slot | null = active && ready[active] ? active : ready.photo ? "photo" : null;
   const busy = slot ? pending[slot] : false;
 
   function onBegin() {
     if (!slot) {
-      setHint("Name a car or upload a photo.");
+      setHint("Upload a photo.");
       return;
     }
     setHint(null);

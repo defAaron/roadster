@@ -241,52 +241,9 @@ h2 {
   position: relative;
   min-height: 250px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   background: #f6f6f3;
   border: 1px solid #d4d5d0;
-}
-
-.text-side {
-  grid-column: 1;
-  grid-row: 1;
-  position: relative;
-  min-width: 0;
-  padding: 25px 26px 22px;
-  border-right: 1px solid #d8d9d4;
-}
-
-.text-side::after {
-  content: "OR";
-  position: absolute;
-  top: 50%;
-  right: 0;
-  z-index: 1;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  transform: translate(50%, -50%);
-  border: 1px solid #d8d9d4;
-  border-radius: 50%;
-  background: #f6f6f3;
-  color: #9b9c97;
-  font: 500 8px/1 var(--font-dm-mono), monospace;
-  pointer-events: none;
-}
-
-.catalog-field {
-  width: 100%;
-  min-height: 135px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #242521;
-  font: 400 15px/1.65 var(--font-manrope), sans-serif;
-}
-
-.catalog-field::placeholder {
-  color: #a4a59f;
 }
 
 .catalog-note {
@@ -302,36 +259,8 @@ h2 {
   color: #8d8f89;
 }
 
-.suggestions {
-  margin: 14px 0 0;
-  list-style: none;
-  padding: 0;
-  border: 1px solid #d4d5d0;
-  background: #fbfbf8;
-}
-
-.suggestions button {
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  border-bottom: 1px solid #e0e1dc;
-  background: transparent;
-  color: inherit;
-  font: 400 14px/1.4 var(--font-manrope), sans-serif;
-  text-align: left;
-  cursor: pointer;
-}
-
-.suggestions li:last-child button {
-  border-bottom: 0;
-}
-
-.suggestions button:hover {
-  background: #eef1ea;
-}
-
 .upload-side {
-  grid-column: 2;
+  grid-column: 1;
   grid-row: 1;
   position: relative;
   min-width: 0;
@@ -514,23 +443,10 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .text-side,
   .upload-side,
   .confirm-span {
     grid-column: 1;
     grid-row: auto;
-  }
-
-  .text-side {
-    border-right: 0;
-    border-bottom: 1px solid #d8d9d4;
-  }
-
-  .text-side::after {
-    top: auto;
-    right: 50%;
-    bottom: 0;
-    transform: translate(50%, 50%);
   }
 
   .upload-side {
