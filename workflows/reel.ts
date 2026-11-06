@@ -16,6 +16,7 @@ import {
   saveVideo,
   sceneRetryPhase,
   sceneSnapshot,
+  syncProviderProject,
 } from "./steps";
 
 const TERMINAL_PROVIDER = new Set(["complete", "error", "canceled"]);
@@ -235,22 +236,43 @@ async function settleAttempt(
   return "stop";
 }
 
+export function waitLoopDecision(input: {
+  stored: { status: string } | null;
+  synced: { status: string } | null;
+  hookStatus: string | null;
+  ageSec: number | null;
+}): WaitResult | { kind: "continue" } {
+  if (input.stored?.status === "timeout") return { kind: "timeout" };
+  if (input.stored && TERMINAL_PROVIDER.has(input.stored.status)) return { kind: "event", status: input.stored.status };
+  if (input.synced && TERMINAL_PROVIDER.has(input.synced.status)) return { kind: "event", status: input.synced.status };
+  if (input.hookStatus === "timeout") return { kind: "timeout" };
+  if (input.hookStatus && TERMINAL_PROVIDER.has(input.hookStatus)) return { kind: "event", status: input.hookStatus };
+  if (input.ageSec != null && input.ageSec > 15 * 60) return { kind: "timeout" };
+  return { kind: "continue" };
+}
+
 export async function waitForProject(projectId: string, requestedAtIso: string): Promise<WaitResult> {
   "use workflow";
   const hook = createHook<{ status: string }>({ token: `mh:${projectId}` });
   for (;;) {
     const existing = await readTerminalEvent(projectId);
-    if (existing?.status === "timeout") return { kind: "timeout" };
-    if (existing && TERMINAL_PROVIDER.has(existing.status)) return { kind: "event", status: existing.status };
+    const stored = waitLoopDecision({ stored: existing, synced: null, hookStatus: null, ageSec: null });
+    if (stored.kind !== "continue") return stored;
+
+    const synced = await syncProviderProject(projectId);
+    const fromProvider = waitLoopDecision({ stored: existing, synced, hookStatus: null, ageSec: null });
+    if (fromProvider.kind !== "continue") return fromProvider;
+
     const raced = await Promise.race([
       hook.then((event) => ({ kind: "hook" as const, status: event.status })),
       sleep("30s").then(() => ({ kind: "tick" as const })),
     ]);
-    if (raced.kind === "hook") {
-      if (raced.status === "timeout") return { kind: "timeout" };
-      if (TERMINAL_PROVIDER.has(raced.status)) return { kind: "event", status: raced.status };
-    }
+    const hookStatus = raced.kind === "hook" ? raced.status : null;
+    const fromHook = waitLoopDecision({ stored: existing, synced, hookStatus, ageSec: null });
+    if (fromHook.kind !== "continue") return fromHook;
+
     const ageSec = await projectAgeSec(projectId, requestedAtIso);
-    if (ageSec > 15 * 60) return { kind: "timeout" };
+    const aged = waitLoopDecision({ stored: existing, synced, hookStatus, ageSec });
+    if (aged.kind !== "continue") return aged;
   }
 }

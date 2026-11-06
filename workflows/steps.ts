@@ -146,6 +146,37 @@ export async function sceneRetryPhase(reelId: string, key: SceneKey): Promise<Sc
 
 const TERMINAL_PROVIDER_STATUSES = new Set(["complete", "error", "canceled"]);
 
+export type ProviderEventInsert = {
+  projectId: string;
+  eventType: string;
+  status: "complete" | "error" | "canceled";
+  payload: {
+    id: string;
+    status: "complete" | "error" | "canceled";
+    credits_charged: number | null;
+    downloads: { url: string; expires_at: string | null }[];
+    error: MagicHourProject["error"];
+  };
+};
+
+export function providerEventFromProject(kind: "image" | "video", project: MagicHourProject): ProviderEventInsert | null {
+  if (project.status !== "complete" && project.status !== "error" && project.status !== "canceled") return null;
+  const status = project.status;
+  const eventType = status === "complete" ? `${kind}.completed` : status === "error" ? `${kind}.errored` : `${kind}.canceled`;
+  return {
+    projectId: project.id,
+    eventType,
+    status,
+    payload: {
+      id: project.id,
+      status,
+      credits_charged: project.creditsCharged,
+      downloads: project.downloads.map((item) => ({ url: item.url, expires_at: item.expiresAt })),
+      error: project.error,
+    },
+  };
+}
+
 export async function readTerminalEvent(projectId: string): Promise<{ status: string } | null> {
   "use step";
   const rows = await db
@@ -156,6 +187,68 @@ export async function readTerminalEvent(projectId: string): Promise<{ status: st
   const found = rows.find((row) => TERMINAL_PROVIDER_STATUSES.has(row.status) || row.status === "timeout");
   if (!found) return null;
   return { status: found.status };
+}
+
+export async function syncProviderProject(
+  projectId: string,
+): Promise<{ status: "complete" | "error" | "canceled" } | null> {
+  "use step";
+  const rows = await db
+    .select({
+      reelId: reelScenes.reelId,
+      sceneKey: reelScenes.sceneKey,
+      imageProjectId: reelScenes.imageProjectId,
+    })
+    .from(reelScenes)
+    .where(or(eq(reelScenes.imageProjectId, projectId), eq(reelScenes.videoProjectId, projectId)));
+  const imageOwner = rows.find((row) => row.imageProjectId === projectId);
+  const scene = imageOwner ?? rows[0];
+  if (!scene) return null;
+  const key = scene.sceneKey === "kickflip" || scene.sceneKey === "flyover" ? scene.sceneKey : null;
+  if (!key) return null;
+  const kind = imageOwner ? "image" : "video";
+
+  try {
+    const client = await magicClient(scene.reelId);
+    const context = { reelId: scene.reelId, sceneKey: key };
+    const project = kind === "image" ? await client.getImage(projectId, context) : await client.getVideo(projectId, context);
+    const record = providerEventFromProject(kind, project);
+    if (!record) return null;
+    await db
+      .insert(providerEvents)
+      .values({
+        projectId: record.projectId,
+        eventType: record.eventType,
+        status: record.status,
+        payload: record.payload,
+      })
+      .onConflictDoNothing();
+    return { status: record.status };
+  } catch (error) {
+    if (error instanceof MagicHourHttpError && (error.status === 401 || error.status === 402)) {
+      await settleHttpFailure(error, scene.reelId, key);
+      throw new FatalError(error.status === 401 ? "provider_auth" : "provider_billing");
+    }
+    if (error instanceof MagicHourHttpError && error.status === 404) {
+      await failScene(scene.reelId, key, "provider_error", error.body);
+      throw new FatalError("provider_rejected");
+    }
+    if (error instanceof MagicHourHttpError && (error.status === 400 || error.status === 422)) {
+      await failScene(scene.reelId, key, "provider_rejected", error.body);
+      throw new FatalError("provider_rejected");
+    }
+    console.error(
+      JSON.stringify({
+        level: "error",
+        operation: "magic_hour_poll",
+        reel_id: scene.reelId,
+        scene_key: key,
+        project_id: projectId,
+        http_status: error instanceof MagicHourHttpError ? error.status : null,
+      }),
+    );
+    return null;
+  }
 }
 
 export async function projectAgeSec(projectId: string, requestedAtIso: string): Promise<number> {
