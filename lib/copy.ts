@@ -16,7 +16,7 @@ export const USER_ERRORS: Record<string, string> = {
   unsupported_type: "Use a JPEG, PNG, WebP, or HEIC photo.",
   not_an_image: "That file is not a photo we can read.",
   image_too_small: "Use a larger photo. The short side needs to be at least 720 pixels.",
-  daily_cap: "Today's limit is 3 reels. Try again tomorrow.",
+  daily_cap: "Today's photo upload limit is reached. Try again tomorrow.",
   reel_in_progress: "A reel is already running.",
   scene_in_flight: "That scene is still running.",
   retry_cap: "This scene has no retries left.",

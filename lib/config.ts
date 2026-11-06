@@ -8,7 +8,6 @@ export type AppConfig = {
   magicHourWebhookSecret: string;
   ipHashSalt: string;
   cronSecret: string;
-  dailyReelCap: number;
   activeReelCap: number;
   uploadDailyCap: number;
   sceneUserRetryCap: number;
@@ -72,7 +71,6 @@ export function readConfig(env: Env): AppConfig {
     magicHourWebhookSecret: optional(env, "MAGIC_HOUR_WEBHOOK_SECRET"),
     ipHashSalt: required(env, "IP_HASH_SALT"),
     cronSecret: optional(env, "CRON_SECRET"),
-    dailyReelCap: integer(env.DAILY_REEL_CAP, 3),
     activeReelCap: integer(env.ACTIVE_REEL_CAP, 1),
     uploadDailyCap: integer(env.UPLOAD_DAILY_CAP, 20),
     sceneUserRetryCap: integer(env.SCENE_USER_RETRY_CAP, 5),

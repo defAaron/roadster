@@ -11,7 +11,6 @@ const fakeEnv = {
 
 test("defaults match the PRD caps and pinned models", () => {
   const config = readConfig({ ...fakeEnv });
-  expect(config.dailyReelCap).toBe(3);
   expect(config.activeReelCap).toBe(1);
   expect(config.uploadDailyCap).toBe(20);
   expect(config.sceneUserRetryCap).toBe(5);
@@ -70,13 +69,13 @@ test("live driver does not require a server magic hour key", () => {
 test("parses integer overrides and splits download hosts", () => {
   const config = readConfig({
     ...fakeEnv,
-    DAILY_REEL_CAP: "4",
+    ACTIVE_REEL_CAP: "2",
     CAP_UTC_OFFSET_MINUTES: "-300",
     MAGIC_HOUR_DOWNLOAD_HOSTS: "videos.magichour.ai, cdn.example.com",
     MAGIC_HOUR_WEBHOOK_SECRET: "whsec",
     CRON_SECRET: "cron",
   });
-  expect(config.dailyReelCap).toBe(4);
+  expect(config.activeReelCap).toBe(2);
   expect(config.capOffsetMinutes).toBe(-300);
   expect(config.downloadHosts).toEqual(["videos.magichour.ai", "cdn.example.com"]);
   expect(config.magicHourWebhookSecret).toBe("whsec");

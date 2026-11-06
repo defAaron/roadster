@@ -55,7 +55,7 @@ export async function createReelFromSource(input: {
   sessionId: string;
   now: Date;
   magicHourKeyCiphertext: string | null;
-}): Promise<{ ok: true } | { ok: false; errorCode: "daily_cap" | "reel_in_progress" | "not_found" }> {
+}): Promise<{ ok: true } | { ok: false; errorCode: "reel_in_progress" | "not_found" }> {
   return db.transaction(async (tx) => {
     const gate = await assertCanCreateReel(
       { ipHash: input.ipHash, sessionId: input.sessionId, now: input.now },

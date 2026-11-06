@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
+import { and, count, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js";
@@ -15,7 +15,7 @@ export type DbTx = PgTransaction<
   ExtractTablesWithRelations<typeof schema>
 >;
 
-export type ReelCapResult = { ok: true } | { ok: false; errorCode: "daily_cap" | "reel_in_progress" };
+export type ReelCapResult = { ok: true } | { ok: false; errorCode: "reel_in_progress" };
 
 export function windowStart(now: Date, offsetMinutes: number): Date {
   const shifted = new Date(now.getTime() + offsetMinutes * 60_000);
@@ -41,8 +41,6 @@ async function countReels(tx: DbTx, where: SQL | undefined): Promise<number> {
 }
 
 async function decide(tx: DbTx, input: { ipHash: string; sessionId: string; now: Date }, config: AppConfig): Promise<ReelCapResult> {
-  const start = windowStart(input.now, config.capOffsetMinutes);
-  const daily = await countReels(tx, and(eq(reels.ipHash, input.ipHash), gte(reels.createdAt, start)));
   const activeHash = await countReels(
     tx,
     and(eq(reels.ipHash, input.ipHash), inArray(reels.status, [...ACTIVE_REEL_STATUSES])),
@@ -51,7 +49,6 @@ async function decide(tx: DbTx, input: { ipHash: string; sessionId: string; now:
     tx,
     and(eq(reels.sessionId, input.sessionId), inArray(reels.status, [...ACTIVE_REEL_STATUSES])),
   );
-  if (daily >= config.dailyReelCap) return { ok: false, errorCode: "daily_cap" };
   if (activeHash >= config.activeReelCap || activeSession >= config.activeReelCap) {
     return { ok: false, errorCode: "reel_in_progress" };
   }
