@@ -99,52 +99,6 @@ export async function createReelFromSource(input: {
   });
 }
 
-export async function createReelFromCatalog(input: {
-  reelId: string;
-  vehicleId: string;
-  sourcePath: string;
-  ipHash: string;
-  sessionId: string;
-  now: Date;
-  magicHourKeyCiphertext: string | null;
-}): Promise<{ ok: true } | { ok: false; errorCode: "daily_cap" | "reel_in_progress" }> {
-  return db.transaction(async (tx) => {
-    const gate = await assertCanCreateReel(
-      { ipHash: input.ipHash, sessionId: input.sessionId, now: input.now },
-      tx,
-    );
-    if (!gate.ok) return gate;
-
-    await tx.insert(reels).values({
-      id: input.reelId,
-      status: "queued",
-      sourceKind: "catalog",
-      vehicleId: input.vehicleId,
-      sourcePath: input.sourcePath,
-      ipHash: input.ipHash,
-      sessionId: input.sessionId,
-      magicHourKeyCiphertext: input.magicHourKeyCiphertext,
-      createdAt: input.now,
-      updatedAt: input.now,
-    });
-    await tx.insert(reelScenes).values([
-      {
-        reelId: input.reelId,
-        sceneKey: "kickflip",
-        status: "pending",
-        attempt: 1,
-      },
-      {
-        reelId: input.reelId,
-        sceneKey: "flyover",
-        status: "pending",
-        attempt: 1,
-      },
-    ]);
-    return { ok: true };
-  });
-}
-
 export async function loadMagicHourKeyCiphertext(reelId: string): Promise<string | null> {
   const [row] = await db
     .select({ magicHourKeyCiphertext: reels.magicHourKeyCiphertext })

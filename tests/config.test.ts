@@ -19,13 +19,11 @@ test("defaults match the PRD caps and pinned models", () => {
   expect(config.imageModel).toBe("seedream-v4.5");
   expect(config.videoModel).toBe("kling-3.0");
   expect(config.getReelPerMinute).toBe(60);
-  expect(config.vehicleSearchPerMinute).toBe(60);
   expect(config.retryPerHour).toBe(10);
   expect(config.downloadHosts).toEqual(["videos.magichour.ai"]);
   expect(config.reelDriver).toBe("fake");
   expect(config.magicHourWebhookSecret).toBe("");
   expect(config.cronSecret).toBe("");
-  expect(config.imaginCustomerKey).toBe("");
 });
 
 test("refuses the magic hour default model", () => {
@@ -77,12 +75,10 @@ test("parses integer overrides and splits download hosts", () => {
     MAGIC_HOUR_DOWNLOAD_HOSTS: "videos.magichour.ai, cdn.example.com",
     MAGIC_HOUR_WEBHOOK_SECRET: "whsec",
     CRON_SECRET: "cron",
-    IMAGIN_CUSTOMER_KEY: "imagin",
   });
   expect(config.dailyReelCap).toBe(4);
   expect(config.capOffsetMinutes).toBe(-300);
   expect(config.downloadHosts).toEqual(["videos.magichour.ai", "cdn.example.com"]);
   expect(config.magicHourWebhookSecret).toBe("whsec");
   expect(config.cronSecret).toBe("cron");
-  expect(config.imaginCustomerKey).toBe("imagin");
 });

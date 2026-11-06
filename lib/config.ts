@@ -6,7 +6,6 @@ export type AppConfig = {
   supabaseUrl: string;
   supabaseServiceRoleKey: string;
   magicHourWebhookSecret: string;
-  imaginCustomerKey: string;
   ipHashSalt: string;
   cronSecret: string;
   dailyReelCap: number;
@@ -15,7 +14,6 @@ export type AppConfig = {
   sceneUserRetryCap: number;
   capOffsetMinutes: number;
   getReelPerMinute: number;
-  vehicleSearchPerMinute: number;
   retryPerHour: number;
   imageModel: string;
   videoModel: string;
@@ -72,7 +70,6 @@ export function readConfig(env: Env): AppConfig {
     supabaseUrl: required(env, "SUPABASE_URL"),
     supabaseServiceRoleKey: required(env, "SUPABASE_SERVICE_ROLE_KEY"),
     magicHourWebhookSecret: optional(env, "MAGIC_HOUR_WEBHOOK_SECRET"),
-    imaginCustomerKey: optional(env, "IMAGIN_CUSTOMER_KEY"),
     ipHashSalt: required(env, "IP_HASH_SALT"),
     cronSecret: optional(env, "CRON_SECRET"),
     dailyReelCap: integer(env.DAILY_REEL_CAP, 3),
@@ -81,7 +78,6 @@ export function readConfig(env: Env): AppConfig {
     sceneUserRetryCap: integer(env.SCENE_USER_RETRY_CAP, 5),
     capOffsetMinutes: integer(env.CAP_UTC_OFFSET_MINUTES, -360),
     getReelPerMinute: integer(env.GET_REEL_PER_MINUTE, 60),
-    vehicleSearchPerMinute: integer(env.VEHICLE_SEARCH_PER_MINUTE, 60),
     retryPerHour: integer(env.RETRY_PER_HOUR, 10),
     imageModel,
     videoModel,

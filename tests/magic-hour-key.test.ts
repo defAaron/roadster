@@ -16,7 +16,6 @@ const mocks = vi.hoisted(() => ({
   loadReel: vi.fn(),
   incrementRateBucket: vi.fn(async () => 1),
   createReelFromSource: vi.fn(),
-  createReelFromCatalog: vi.fn(),
   loadSource: vi.fn(),
 }));
 
@@ -26,7 +25,6 @@ vi.mock("@/lib/db/reels", () => ({
   loadReel: mocks.loadReel,
   incrementRateBucket: mocks.incrementRateBucket,
   createReelFromSource: mocks.createReelFromSource,
-  createReelFromCatalog: mocks.createReelFromCatalog,
   loadSource: mocks.loadSource,
 }));
 
@@ -104,7 +102,6 @@ beforeEach(() => {
   mocks.incrementRateBucket.mockReset();
   mocks.incrementRateBucket.mockResolvedValue(1);
   mocks.createReelFromSource.mockReset();
-  mocks.createReelFromCatalog.mockReset();
   mocks.loadSource.mockReset();
 });
 
@@ -116,7 +113,7 @@ test("live create rejects a missing, blank, or overlong magic hour key", async (
     const cases = [
       {},
       { magicHourApiKey: "   " },
-      { magicHourApiKey: LONG_KEY, vehicleId: "not-a-uuid" },
+      { magicHourApiKey: LONG_KEY },
       { magicHourApiKey: 12 },
     ];
     for (const body of cases) {
@@ -128,7 +125,6 @@ test("live create rejects a missing, blank, or overlong magic hour key", async (
       expect(text).not.toContain("visitor-secret-key!");
     }
     expect(mocks.createReelFromSource).not.toHaveBeenCalled();
-    expect(mocks.createReelFromCatalog).not.toHaveBeenCalled();
     expect(mocks.loadSource).not.toHaveBeenCalled();
     expect(done()).not.toContain(LONG_KEY);
     expect(done()).not.toContain("visitor-secret-key!");
