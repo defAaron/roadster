@@ -1,6 +1,6 @@
 # Grading the first 30 reels
 
-This sheet is empty until a person grades reels by hand. Fill one row per reel. Stop at 30 graded rows. This problem does not generate reels and does not change `DAILY_REEL_CAP`.
+This sheet is empty until a person grades reels by hand. Fill one row per reel. Stop at 30 graded rows. This problem does not generate reels.
 
 ## Pass bar
 
@@ -25,4 +25,4 @@ Use `yes` or `no` in the yes/no columns. Source is `upload` or `catalog`. Leave 
 
 The only code knobs are `MAGIC_HOUR_IMAGE_MODEL`, `MAGIC_HOUR_VIDEO_MODEL`, and the strings in `lib/scenes.ts` (`SHARED`, the kickflip and flyover still lines, and the kickflip and flyover motion lines). `wan-2.2` must keep omitting `end_image_file_path`.
 
-Raising the cap is an env change to `DAILY_REEL_CAP` after 30 graded rows, done by a person. Do not raise the cap from this sheet, and do not change it in code to finish grading.
+Reel creation has no daily cap to raise. Do not add one from this sheet, and do not change rate limits in code to finish grading.

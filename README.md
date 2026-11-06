@@ -8,5 +8,5 @@ Roadster takes a photo of a car and returns scenes of that same car doing two st
 - [ ] Two scenes, always: kickflip and flyover, each one still plus one 8-second video
 - [ ] Keep the source car’s identity; add the stunt behavior only
 - [ ] Store the files ourselves and show them on an unguessable result link, with a download for each asset
-- [ ] One reel at a time per session, and a daily cap of 3 reels per IP
+- [ ] One reel at a time per session
 - [ ] Disclaimer on confirm and on the result
