@@ -1,4 +1,5 @@
 import { CatalogSearch } from "@/components/catalog-search";
+import { CreationFrame } from "@/components/creation-frame";
 import { HomeFlow } from "@/components/home-flow";
 import { MagicHourKeyField } from "@/components/magic-hour-key";
 
@@ -19,18 +20,20 @@ export default function HomePage() {
       <div className="control-panel">
         <MagicHourKeyField>
           <div className="panel-rule" />
-          <section className="input-section" aria-labelledby="input-label">
-            <div className="section-heading">
-              <div>
-                <h2 id="input-label">Choose your starting point</h2>
-                <p>Use words or an image reference</p>
+          <CreationFrame>
+            <section className="input-section" aria-labelledby="input-label">
+              <div className="section-heading">
+                <div>
+                  <h2 id="input-label">Choose your starting point</h2>
+                  <p>Use words or an image reference</p>
+                </div>
               </div>
-            </div>
-            <div className="creation-input">
-              <CatalogSearch />
-              <HomeFlow />
-            </div>
-          </section>
+              <div className="creation-input">
+                <CatalogSearch />
+                <HomeFlow />
+              </div>
+            </section>
+          </CreationFrame>
         </MagicHourKeyField>
       </div>
     </main>

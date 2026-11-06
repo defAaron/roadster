@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmPanel } from "@/components/confirm-panel";
+import { useBeginSource } from "@/components/creation-frame";
 import { useMagicHourKey } from "@/components/magic-hour-key";
 import { userError } from "@/lib/copy";
 
@@ -152,6 +153,14 @@ export function CatalogSearch() {
     setVehicleId(suggestion.id);
   }
 
+  useBeginSource("catalog", {
+    ready: Boolean(vehicleId),
+    pending,
+    start: () => {
+      void startReel();
+    },
+  });
+
   async function startReel() {
     if (!vehicleId || starting.current) return;
     const magicHourApiKey = readMagicHourKey();
@@ -229,12 +238,7 @@ export function CatalogSearch() {
       </div>
       {previewUrl ? (
         <div className="confirm-span">
-          <ConfirmPanel
-            previewUrl={previewUrl}
-            warnings={[]}
-            pending={pending}
-            onStart={() => void startReel()}
-          />
+          <ConfirmPanel previewUrl={previewUrl} warnings={[]} />
         </div>
       ) : null}
     </>

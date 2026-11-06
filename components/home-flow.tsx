@@ -3,6 +3,7 @@
 import { useRef, useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmPanel } from "@/components/confirm-panel";
+import { useBeginSource } from "@/components/creation-frame";
 import { useMagicHourKey } from "@/components/magic-hour-key";
 import { userError } from "@/lib/copy";
 
@@ -154,6 +155,14 @@ export function HomeFlow() {
     router.push(`/r/${(payload as { id: string }).id}`);
   }
 
+  useBeginSource("photo", {
+    ready: Boolean(sourceId),
+    pending,
+    start: () => {
+      void startReel();
+    },
+  });
+
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragging(false);
@@ -202,12 +211,7 @@ export function HomeFlow() {
       </div>
       {previewUrl ? (
         <div className="confirm-span">
-          <ConfirmPanel
-            previewUrl={previewUrl}
-            warnings={warnings}
-            pending={pending}
-            onStart={() => void startReel()}
-          />
+          <ConfirmPanel previewUrl={previewUrl} warnings={warnings} />
         </div>
       ) : null}
     </>
