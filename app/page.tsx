@@ -4,19 +4,35 @@ import { MagicHourKeyField } from "@/components/magic-hour-key";
 
 export default function HomePage() {
   return (
-    <main className="mx-auto max-w-xl px-5 py-14">
-      <h1 className="text-4xl">Roadster</h1>
-      <p className="mt-3 max-w-sm text-[var(--quiet)]">See your car do the kickflip and the flyover.</p>
-      <MagicHourKeyField>
-        <HomeFlow />
-        <div className="mt-14 flex items-center gap-3" aria-hidden="true">
-          <span className="h-px flex-1 bg-[var(--line)]" />
-          <span className="text-sm text-[var(--quiet)]">or</span>
-          <span className="h-px flex-1 bg-[var(--line)]" />
-        </div>
-        <h2 className="sr-only">Or name the car</h2>
-        <CatalogSearch />
-      </MagicHourKeyField>
+    <main className="app-shell">
+      <div className="ambient-layer" aria-hidden="true">
+        <div className="ambient ambient-one" />
+        <div className="ambient ambient-two" />
+      </div>
+
+      <section className="hero">
+        <h1>
+          Reimagine your car as the <em>Roadster</em>
+        </h1>
+      </section>
+
+      <div className="control-panel">
+        <MagicHourKeyField>
+          <div className="panel-rule" />
+          <section className="input-section" aria-labelledby="input-label">
+            <div className="section-heading">
+              <div>
+                <h2 id="input-label">Choose your starting point</h2>
+                <p>Use words or an image reference</p>
+              </div>
+            </div>
+            <div className="creation-input">
+              <CatalogSearch />
+              <HomeFlow />
+            </div>
+          </section>
+        </MagicHourKeyField>
+      </div>
     </main>
   );
 }

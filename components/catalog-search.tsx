@@ -189,51 +189,54 @@ export function CatalogSearch() {
   }
 
   return (
-    <div className="mt-4">
-      <label htmlFor="catalog-name" className="block text-sm">
-        Name the car
-      </label>
-      <input
-        id="catalog-name"
-        type="text"
-        value={query}
-        autoComplete="off"
-        placeholder="Year, make, or model"
-        onChange={(event) => onQueryChange(event.target.value)}
-        className="mt-2 w-full border border-[var(--line)] bg-white px-3 py-2.5 placeholder:text-[var(--quiet)]"
-      />
-      {notice ? (
-        <p className="mt-3 text-sm text-[var(--copper)]" role="alert">
-          {notice}
-        </p>
-      ) : null}
-      {noMatches ? <p className="mt-3 text-sm text-[var(--quiet)]">No matching cars.</p> : null}
-      {lookingUp ? <p className="mt-3 text-sm text-[var(--quiet)]">Looking up a photo…</p> : null}
-      {suggestions.length > 0 ? (
-        <ul className="mt-3 list-none divide-y divide-[var(--line)] border border-[var(--line)] bg-white p-0">
-          {suggestions.map((suggestion) => (
-            <li key={suggestion.id}>
-              <button
-                type="button"
-                className="w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-[var(--paper)]"
-                onClick={() => {
-                  void choose(suggestion);
-                }}
-              >
-                {suggestion.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {previewUrl ? (
-        <ConfirmPanel
-          previewUrl={previewUrl}
-          warnings={[]}
-          pending={pending}
-          onStart={() => void startReel()}
+    <>
+      <div className="text-side">
+        <label className="sr-only" htmlFor="catalog-name">
+          Name the car
+        </label>
+        <input
+          id="catalog-name"
+          type="text"
+          value={query}
+          autoComplete="off"
+          placeholder="Year, make, or model"
+          onChange={(event) => onQueryChange(event.target.value)}
+          className="catalog-field"
         />
+        {notice ? (
+          <p className="catalog-note alert" role="alert">
+            {notice}
+          </p>
+        ) : null}
+        {noMatches ? <p className="catalog-note quiet">No matching cars.</p> : null}
+        {lookingUp ? <p className="catalog-note quiet">Looking up a photo…</p> : null}
+        {suggestions.length > 0 ? (
+          <ul className="suggestions">
+            {suggestions.map((suggestion) => (
+              <li key={suggestion.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void choose(suggestion);
+                  }}
+                >
+                  {suggestion.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      {previewUrl ? (
+        <div className="confirm-span">
+          <ConfirmPanel
+            previewUrl={previewUrl}
+            warnings={[]}
+            pending={pending}
+            onStart={() => void startReel()}
+          />
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmPanel } from "@/components/confirm-panel";
 import { useMagicHourKey } from "@/components/magic-hour-key";
@@ -22,6 +22,20 @@ function isAllowedPhoto(file: File): boolean {
   if (type !== "") return false;
   const name = file.name.toLowerCase();
   return name.endsWith(".heic") || name.endsWith(".heif");
+}
+
+function UploadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" width="18" height="18">
+      <path
+        d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function errorCode(payload: unknown): string {
@@ -55,6 +69,7 @@ export function HomeFlow() {
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pending, setPending] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   function clearPreview() {
     setPreviewUrl("");
@@ -139,41 +154,62 @@ export function HomeFlow() {
     router.push(`/r/${(payload as { id: string }).id}`);
   }
 
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(false);
+    void acceptFile(event.dataTransfer.files?.[0]);
+  }
+
   return (
-    <div className="mt-8">
-      {fileError ? (
-        <p className="mb-3 text-sm text-[var(--copper)]" role="alert">
-          {fileError}
-        </p>
-      ) : null}
-      <label
-        htmlFor="car-photo"
-        className="relative flex w-full cursor-pointer items-center justify-between gap-4 border border-[var(--line)] bg-white px-3 py-2.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-solid focus-within:[outline-color:var(--copper)]"
+    <>
+      <div
+        className={dragging ? "upload-side dragging" : "upload-side"}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
       >
-        <span>{uploading ? "Reading the photo…" : "Choose a photo"}</span>
-        <span className="shrink-0 text-sm text-[var(--quiet)]">JPEG, PNG, WebP, HEIC</span>
-        <input
-          id="car-photo"
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-          aria-label="Car photo"
-          className="sr-only"
-          onChange={(event) => {
-            const input = event.currentTarget;
-            const selected = input.files?.[0];
-            input.value = "";
-            void acceptFile(selected);
-          }}
-        />
-      </label>
+        {fileError ? (
+          <p className="upload-error" role="alert">
+            {fileError}
+          </p>
+        ) : null}
+        <label htmlFor="car-photo" className="upload-prompt">
+          <span className="upload-icon">
+            <UploadIcon />
+          </span>
+          <strong>{uploading ? "Reading the photo…" : "Upload a reference"}</strong>
+          <span>
+            Drop an image here or <u>browse</u>
+          </span>
+          <small>JPEG, PNG, WEBP, HEIC · MAX 20 MB</small>
+          <input
+            id="car-photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+            aria-label="Car photo"
+            className="sr-only"
+            onChange={(event) => {
+              const input = event.currentTarget;
+              const selected = input.files?.[0];
+              input.value = "";
+              void acceptFile(selected);
+            }}
+          />
+        </label>
+      </div>
       {previewUrl ? (
-        <ConfirmPanel
-          previewUrl={previewUrl}
-          warnings={warnings}
-          pending={pending}
-          onStart={() => void startReel()}
-        />
+        <div className="confirm-span">
+          <ConfirmPanel
+            previewUrl={previewUrl}
+            warnings={warnings}
+            pending={pending}
+            onStart={() => void startReel()}
+          />
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }

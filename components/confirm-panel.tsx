@@ -3,6 +3,20 @@ import { Disclaimer } from "@/components/disclaimer";
 const GUIDANCE =
   "A good photo is one car, fully in frame, from the side or a front three-quarter, in daylight, with the background unobstructed.";
 
+function ArrowIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" width="18" height="18">
+      <path
+        d="M5 12h14m-5-5 5 5-5 5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ConfirmPanel({
   previewUrl,
   warnings,
@@ -15,35 +29,34 @@ export function ConfirmPanel({
   pending?: boolean;
 }) {
   return (
-    <section className="mt-6">
+    <section>
       {previewUrl ? (
         // Local object URLs are not compatible with next/image.
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={previewUrl}
-          alt="Your car"
-          className="mt-6 w-full max-h-80 border border-[var(--line)] bg-white object-contain"
-        />
+        <img src={previewUrl} alt="Your car" className="confirm-photo" />
       ) : null}
-      <p className="mt-4 text-sm text-[var(--quiet)]">{GUIDANCE}</p>
-      {warnings.includes("dark") ? (
-        <p className="mt-3 text-sm">This photo looks dark. Daylight works better. You can still continue.</p>
-      ) : null}
-      {warnings.includes("cropped") ? (
-        <p className="mt-3 text-sm">This photo may be cropped or very wide. You can still continue.</p>
-      ) : null}
-      <div className="mt-4">
-        <Disclaimer />
+      <div className="form-footer">
+        <div className="confirm-copy">
+          <p>{GUIDANCE}</p>
+          {warnings.includes("dark") ? (
+            <p>This photo looks dark. Daylight works better. You can still continue.</p>
+          ) : null}
+          {warnings.includes("cropped") ? (
+            <p>This photo may be cropped or very wide. You can still continue.</p>
+          ) : null}
+          <Disclaimer />
+        </div>
+        <button
+          type="button"
+          className="primary-button"
+          onClick={onStart}
+          disabled={pending || previewUrl.length === 0}
+          aria-busy={pending || undefined}
+        >
+          <span>{pending ? "Starting…" : "BEGIN CREATION"}</span>
+          <ArrowIcon />
+        </button>
       </div>
-      <button
-        type="button"
-        className="mt-6 cursor-pointer bg-[var(--copper)] px-4 py-2.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
-        onClick={onStart}
-        disabled={pending || previewUrl.length === 0}
-        aria-busy={pending || undefined}
-      >
-        {pending ? "Starting…" : "Start the reel"}
-      </button>
     </section>
   );
 }

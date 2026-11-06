@@ -290,7 +290,7 @@ test("the visitor key is encrypted with the hash salt and omitted from errors", 
 
 test("the home page shows an empty magic hour key field", () => {
   const html = renderToStaticMarkup(createElement(MagicHourKeyField, null, createElement("p", null, "flows")));
-  expect(html).toContain("Magic Hour API key");
+  expect(html).toContain("Connect your API key");
   expect(html).toContain('type="password"');
   expect(html.toLowerCase()).toContain('autocomplete="off"');
   expect(html).toContain('value=""');
